@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.clearSnow = { [weak self] in self?.clearSnow() }
         model.callSkater = { [weak self] in self?.callSkater() }
         model.setLaser = { [weak self] on in self?.laserOn = on }
+        model.callBird = { [weak self] in self?.screens.forEach { $0.simulation.callBird() } }
         // ⌃⌥L: the laser pointer, from anywhere.
         laserKey = HotKey(keyCode: UInt32(kVK_ANSI_L), modifiers: UInt32(controlKey | optionKey), id: 1) { [weak self] in
             self?.toggleLaser()

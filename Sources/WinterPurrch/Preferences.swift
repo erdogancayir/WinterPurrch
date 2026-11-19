@@ -8,7 +8,7 @@ final class Preferences {
         d.register(defaults: [
             "intensity": 0.5, "opacity": 1.0,
             "ground": true, "dock": true, "windows": true,
-            "melt": true, "cat": true, "friend": true, "skater": true, "batterySaver": true, "catSize": 42.0, "blizzard": false, "screenshots": false,
+            "melt": true, "cat": true, "friend": true, "skater": true, "birds": true, "batterySaver": true, "catSize": 42.0, "blizzard": false, "screenshots": false,
             "dockTopOffset": -1.0, "dockWidthAdjust": 0.0,
         ])
     }
@@ -22,6 +22,7 @@ final class Preferences {
     var blizzard: Bool { get { d.bool(forKey: "blizzard") } set { d.set(newValue, forKey: "blizzard") } }
     var catSize: Float { get { d.float(forKey: "catSize") } set { d.set(newValue, forKey: "catSize") } }
     var batterySaver: Bool { get { d.bool(forKey: "batterySaver") } set { d.set(newValue, forKey: "batterySaver") } }
+    var birds: Bool { get { d.bool(forKey: "birds") } set { d.set(newValue, forKey: "birds") } }
     var skater: Bool { get { d.bool(forKey: "skater") } set { d.set(newValue, forKey: "skater") } }
     var friend: Bool { get { d.bool(forKey: "friend") } set { d.set(newValue, forKey: "friend") } }
     var cat: Bool { get { d.bool(forKey: "cat") } set { d.set(newValue, forKey: "cat") } }
@@ -32,6 +33,6 @@ final class Preferences {
 
     var settings: Settings {
         Settings(intensity: intensity, opacity: opacity, ground: ground, dock: dock, windows: windows,
-                 melt: melt, blizzard: blizzard, cat: cat, friend: friend, skater: skater, catSize: catSize)
+                 melt: melt, blizzard: blizzard, cat: cat, friend: friend, skater: skater, birds: birds, catSize: catSize)
     }
 }

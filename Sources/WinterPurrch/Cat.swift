@@ -42,6 +42,7 @@ struct Cat {
     var hunting = false                 // after the laser dot
     var huntCrouch: Float = 0           // time spent crouched, bottom wiggling, before pouncing
     var huntJump: Float = 0             // pause between leaps after the dot
+    var sneaking = false                // creeping up on a bird
     var deepSleep = false               // stroked to sleep: stays asleep until clicked
     var look: Float = 0                 // 1 looking at the viewer, 0 looking where it is going
     var lookTime: Float = 0
@@ -258,7 +259,14 @@ extension SnowSimulation {
             c.nextCoffee -= dt
             c.nextPlay -= dt
         }
-        if let dot = laser { hunt(&c, dot, dt, active) } else if c.hunting { c.hunting = false }
+        if let dot = laser {
+            hunt(&c, dot, dt, active, prey: false)
+        } else if let b = bird, b.state == .perched, c.state != .sleeping {
+            hunt(&c, b.p, dt, active, prey: true)
+        } else if c.hunting {
+            c.hunting = false
+            c.sneaking = false
+        }
 
         switch c.state {
         case .airborne: fly(&c, dt, active)
@@ -272,7 +280,8 @@ extension SnowSimulation {
 
     /// Chases the red dot: runs to it along its ledge, crouches with its bottom wiggling, pounces; leaps up to the
     /// ledge it is on; sits and stares at it in mid-air. A cat stroked to sleep sleeps on.
-    private func hunt(_ c: inout Cat, _ dot: SIMD2<Float>, _ dt: Float, _ active: [Ledge]) {
+    /// The same chase serves a bird (`prey`): crept up on slowly, stalked from further off, pounced on harder.
+    private func hunt(_ c: inout Cat, _ dot: SIMD2<Float>, _ dt: Float, _ active: [Ledge], prey: Bool) {
         guard c.errand == .none, !c.carrying, !c.deepSleep,
               [.walking, .sitting, .sleeping, .playing, .digging, .grooming].contains(c.state),
               let id = c.ledge, let l = ledges[id]
@@ -303,10 +312,24 @@ extension SnowSimulation {
             c.huntCrouch = 0
             return
         }
+        // A bird is stalked from a few lengths off; the dot is pounced on directly.
+        let reach = prey ? c.size * 2.8 : c.size * 1.8
+        c.sneaking = prey
         if target.id != l.id {
-            if c.huntJump <= 0, let col = target.column(at: dot.x), abs(dot.x - c.p.x) < 420, target.y - c.p.y < 340 {
-                c.huntJump = 1
-                jump(&c, to: SIMD2(dot.x, target.y + target.h[col]))
+            // Below the ledge it is on, straight down would only land it back on this ledge: off an end first.
+            if target.y < l.y && l.kind != .ground && c.p.x > l.x0 - c.size && c.p.x < l.x0 + l.width + c.size
+                && dot.x > l.x0 - c.size && dot.x < l.x0 + l.width + c.size {
+                c.state = .walking
+                c.facing = (c.p.x - l.x0) < l.width / 2 ? -1 : 1
+                c.timer = 2
+                c.fleeing = prey ? 0 : 0.25
+                c.descend = true
+                return
+            }
+            let landX = prey ? min(max(dot.x - side * c.size * 3.2, target.x0 + c.size), target.x0 + target.width - c.size) : dot.x
+            if c.huntJump <= 0, let col = target.column(at: landX), abs(landX - c.p.x) < 420, target.y - c.p.y < 340 {
+                c.huntJump = prey ? 3 : 1
+                jump(&c, to: SIMD2(landX, target.y + target.h[col]))
             } else {
                 c.state = .walking
                 c.facing = side
@@ -326,11 +349,11 @@ extension SnowSimulation {
                 return
             }
         }
-        if abs(dx) > c.size * 1.8 {
+        if abs(dx) > reach {
             c.state = .walking
             c.facing = side
             c.timer = 2
-            c.fleeing = 0.25            // at a run
+            c.fleeing = prey ? 0 : 0.25     // at a run after the dot, creeping after a bird
             c.huntCrouch = 0
         } else {
             c.state = .playing
@@ -338,9 +361,9 @@ extension SnowSimulation {
             c.timer = 2
             c.swatTimer = 1
             c.huntCrouch += dt
-            if c.huntCrouch > rand(0.5, 0.9) {
+            if c.huntCrouch > (prey ? rand(1.2, 1.8) : rand(0.5, 0.9)) {
                 c.huntCrouch = 0
-                hop(&c, SIMD2(dx * 3.2, rand(280, 360)))
+                hop(&c, SIMD2(dx * (prey ? 2.6 : 3.2), prey ? rand(380, 440) : rand(280, 360)))
             }
         }
     }
@@ -647,6 +670,7 @@ extension SnowSimulation {
 
     private func walk(_ c: inout Cat, _ l: Ledge, _ dt: Float, _ active: [Ledge]) {
         var speed: Float = (c.errand == .none ? 36 : 72) * c.size / 18
+        if c.sneaking { speed *= 0.55 }
         if c.fleeing > 0 {
             speed *= 3
             c.fleeing -= dt

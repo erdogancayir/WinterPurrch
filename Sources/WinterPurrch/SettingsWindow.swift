@@ -10,6 +10,7 @@ final class SettingsModel: ObservableObject {
     var clearSnow: () -> Void = {}
     var callSkater: () -> Void = {}
     var setLaser: (Bool) -> Void = { _ in }
+    var callBird: () -> Void = {}
     /// Mirrors the laser pointer's state, which the shortcut can also change.
     @Published var laserShown = false
 
@@ -25,6 +26,7 @@ final class SettingsModel: ObservableObject {
     @Published var catSize: Double { didSet { prefs.catSize = Float(catSize); apply() } }
     @Published var screenshots: Bool { didSet { prefs.screenshots = screenshots; apply() } }
     @Published var skater: Bool { didSet { prefs.skater = skater; apply() } }
+    @Published var birds: Bool { didSet { prefs.birds = birds; apply() } }
     @Published var batterySaver: Bool { didSet { prefs.batterySaver = batterySaver; apply() } }
     @Published var paused = false { didSet { setPaused(paused) } }
     @Published var openAtLogin: Bool {
@@ -54,13 +56,14 @@ final class SettingsModel: ObservableObject {
         screenshots = prefs.screenshots
         skater = prefs.skater
         batterySaver = prefs.batterySaver
+        birds = prefs.birds
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
     /// Picks up changes made from the menu bar.
     func reload(paused: Bool) {
         let fresh = SettingsModel()
-        let keep = (apply, setPaused, clearSnow, callSkater, setLaser)
+        let keep = (apply, setPaused, clearSnow, callSkater, setLaser, callBird)
         apply = {}
         setPaused = { _ in }
         intensity = fresh.intensity
@@ -76,8 +79,9 @@ final class SettingsModel: ObservableObject {
         screenshots = fresh.screenshots
         skater = fresh.skater
         batterySaver = fresh.batterySaver
+        birds = fresh.birds
         self.paused = paused
-        (apply, setPaused, clearSnow, callSkater, setLaser) = keep
+        (apply, setPaused, clearSnow, callSkater, setLaser, callBird) = keep
     }
 }
 
@@ -108,6 +112,11 @@ struct SettingsView: View {
                     get: { model.laserShown }, set: { model.setLaser($0) }
                 )).disabled(!model.cat)
                 LabeledContent(L("Cat Size")) { Slider(value: $model.catSize, in: 16...80) }.disabled(!model.cat)
+                HStack {
+                    Toggle(L("Birds drop by now and then"), isOn: $model.birds)
+                    Spacer()
+                    Button(L("Call a Bird")) { model.callBird() }.disabled(!model.birds)
+                }
                 Text(L("Click a cat to startle it; rest or stroke the cursor on it to pet it. Hold ⌥ and drag snow to make snowballs."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)

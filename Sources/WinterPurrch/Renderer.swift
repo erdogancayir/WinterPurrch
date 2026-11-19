@@ -532,6 +532,55 @@ float4 drawSkater(float2 uv, float px, float phase, float facing, float4 ex, flo
     return o;
 }
 
+// A robin, side on: brown back, orange-red breast, white belly. Units: y = 0 at its feet.
+float4 drawBird(float2 uv, float px, float phase, float facing, float flying, float peck) {
+    float2 q = float2(uv.x * facing, uv.y + 0.6);
+    if (peck > 0.0) {
+        // Bobbing forward to peck.
+        float a = peck * 0.6;
+        float2 c0 = float2(0.0, 0.15);
+        float ca = cos(a), sa = sin(a);
+        float2 d = q - c0;
+        q = c0 + float2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
+    }
+    float body = sdEll(q, float2(0.0, 0.55), float2(0.55, 0.42));
+    float head = length(q - float2(0.42, 0.9)) - 0.3;
+    float tail = sdTriangle(q, float2(-0.42, 0.6), float2(-1.05, 0.98), float2(-0.98, 0.74)) - 0.04;
+    float beak = sdTriangle(q, float2(0.66, 0.95), float2(0.92, 0.88), float2(0.66, 0.82));
+    float legs = flying > 0.5 ? 1e3 : min(segDist(q, float2(-0.06, 0.22), float2(-0.1, 0.0)), segDist(q, float2(0.12, 0.22), float2(0.16, 0.0))) - 0.03;
+    float wing;
+    if (flying > 0.5) {
+        float w = sin(phase) * 1.0;
+        float2 sh = float2(-0.05, 0.78);
+        float2 d = q - sh;
+        float cw = cos(w), sw = sin(w);
+        d = float2(cw * d.x + sw * d.y, -sw * d.x + cw * d.y);
+        wing = sdEll(d, float2(-0.32, 0.12), float2(0.46, 0.16));
+    } else {
+        wing = sdEll(q, float2(-0.12, 0.62), float2(0.42, 0.22));
+    }
+    float D = min(min(min(body, head), min(tail, beak)), min(legs, wing));
+    float3 brown = float3(0.47, 0.36, 0.3);
+    float4 o = float4(0);
+    o = over(o, catLine, fillA(D - 0.05, px) * 0.9);
+    o = over(o, float3(0.35, 0.25, 0.2), fillA(legs, px));
+    o = over(o, brown * 0.9, fillA(tail, px));
+    o = over(o, brown, fillA(body, px));
+    // Orange-red breast and a white belly.
+    float breast = smoothstep(-0.2, 0.15, q.x) * (1.0 - smoothstep(0.78, 0.9, q.y));
+    o = over(o, float3(0.95, 0.45, 0.22), fillA(body, px) * breast);
+    o = over(o, float3(0.98, 0.96, 0.92), fillA(body, px) * (1.0 - smoothstep(0.22, 0.36, q.y)));
+    o = over(o, brown, fillA(head, px));
+    o = over(o, float3(0.95, 0.45, 0.22), fillA(max(head, -(0.86 - q.y)), px) * smoothstep(0.35, 0.55, q.x));
+    o = over(o, float3(0.98, 0.75, 0.2), fillA(beak, px));
+    float2 e = float2(0.5, 0.96);
+    o = over(o, float3(0.08, 0.07, 0.08), fillA(length(q - e) - 0.065, px));
+    o = over(o, float3(1.0), fillA(length(q - e - float2(0.02, 0.025)) - 0.022, px));
+    o = over(o, catLine, fillA(wing - 0.04, px) * 0.6);
+    o = over(o, float3(0.38, 0.28, 0.23), fillA(wing, px));
+    return o;
+}
+
 // A mug of coffee, steaming while it is fresh. Units are the mug's size.
 float4 drawMug(float2 p, float px, float steam, float time, float seed) {
     float4 o = float4(0);
@@ -581,6 +630,7 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
         else if (in.kind < 7.5) c = drawHeart(uv, px);
         else if (in.kind < 8.5) c = drawZ(uv, px);
         else if (in.kind < 9.5) c = drawSkater(uv, px, in.seed, in.facing, in.ex, in.ex2);
+        else if (in.kind > 10.5) c = drawBird(uv, px, in.seed, in.facing, in.ex.x, in.ex.y);
         else {
             // The laser dot: a hot white core in a red glow.
             float flicker = 0.92 + 0.08 * sin(u.time * 40.0);
@@ -891,6 +941,11 @@ final class Renderer: NSObject, MTKViewDelegate {
             let c = sk.p + SIMD2(0, sk.unit * 1.25)
             sprites.append(SpriteInstance(px: c.x, py: c.y, r: sk.unit, alpha: 1, kind: 9, seed: sk.phase, ext: 2.0,
                                           pad: sk.facing, a: sk.crouch, b: sk.flip, c: sk.spin, d: sk.tilt, e: sk.grab))
+        }
+        if let b = sim.bird {
+            let c = b.p + SIMD2(0, b.unit * 0.6)
+            sprites.append(SpriteInstance(px: c.x, py: c.y, r: b.unit, alpha: 1, kind: 11, seed: b.phase, ext: 1.7,
+                                          pad: b.facing, a: b.flying ? 1 : 0, b: b.peck))
         }
         if let dot = sim.laser {
             sprites.append(SpriteInstance(px: dot.x, py: dot.y, r: 7, alpha: 1, kind: 10, seed: 0, ext: 2.6, pad: 1))

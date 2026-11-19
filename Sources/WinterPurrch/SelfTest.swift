@@ -298,6 +298,27 @@ enum SelfTest {
             run(1)
         }
 
+        // A bird drops in; the cats stalk it and it gets away.
+        for i in sim.cats.indices where sim.cats[i].state == .sleeping {
+            sim.cats[i].state = .sitting
+            sim.cats[i].deepSleep = false
+        }
+        sim.callBird()
+        var birdFrames = 0, perched = 0, sneaking = 0, crouching = 0
+        var shotPerch = false, shotStalk = false, shotFly = false
+        while sim.bird != nil && birdFrames < 60 * 40 {
+            run(1.0 / 60) { _ in SIMD2(-100, -100) }
+            birdFrames += 1
+            guard let b = sim.bird else { break }
+            if b.state == .perched { perched += 1 }
+            if sim.cats.contains(where: { $0.sneaking && $0.state == .walking }) { sneaking += 1 }
+            if sim.cats.contains(where: { $0.sneaking && $0.state == .playing }) { crouching += 1 }
+            if !shotPerch && b.state == .perched && perched > 30 { shot("bird-perched"); shotPerch = true }
+            if !shotStalk && crouching > 20 { shot("bird-stalk"); shotStalk = true }
+            if !shotFly && b.state == .leaving && perched > 0 { run(0.15); shot("bird-away"); shotFly = true }
+        }
+        print("selftest: bird: \(birdFrames) frames, perched \(perched), cats creeping \(sneaking), crouched \(crouching), gone=\(sim.bird == nil)")
+
         // The skater: rides in, pops tricks, grinds the Dock and leaves.
         sim.callSkater()
         var frames = 0, airborne = 0, onDock = 0, tricks = Set<String>()

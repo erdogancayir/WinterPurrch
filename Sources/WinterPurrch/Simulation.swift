@@ -17,6 +17,7 @@ struct Settings {
     var cat = true
     var friend = true
     var skater = true
+    var birds = true
     var catSize: Float = 42
 }
 
@@ -119,6 +120,8 @@ final class SnowSimulation {
     var skaterCooldown: Float = 90
     /// The laser pointer: a red dot at the cursor that the cats chase.
     var laserOn = false
+    var bird: Bird?
+    var birdCooldown: Float = 50
     var laser: SIMD2<Float>? { laserOn ? cursor : nil }
     /// The first cat, for code that deals with one.
     var cat: Cat? {
@@ -407,6 +410,7 @@ final class SnowSimulation {
         updateBalls(dt, active)
         updateCat(dt, active)
         updateSkater(dt)
+        updateBird(dt, active)
         settle(dt, active)
         if !pending.isEmpty {
             flakes.append(contentsOf: pending)
