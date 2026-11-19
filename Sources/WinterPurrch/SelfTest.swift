@@ -203,6 +203,39 @@ enum SelfTest {
         }
         catLine("petted")
         shot("cat-pet")
+        // Stroking it back and forth puts it to sleep.
+        if let c = sim.cat {
+            let spot = c.center
+            run(3.5) { t in spot + SIMD2(sin(t * 40) * c.size * 0.6, 0) }
+            catLine("stroked")
+            shot("cat-stroked")
+        }
+
+        // The two friends meet on the ground: they nuzzle or play tag.
+        print("selftest: cats=\(sim.cats.count) coats=\(sim.cats.map(\.coat))")
+        if sim.cats.count == 2, let ground = sim.ledges[SnowSimulation.groundID] {
+            for i in 0..<2 {
+                sim.cats[i].state = .walking
+                sim.cats[i].ledge = ground.id
+                sim.cats[i].offset = 120 + Float(i) * 40
+                sim.cats[i].lastLedge = SIMD2(ground.x0, ground.y)
+                sim.cats[i].errand = .none
+                sim.cats[i].fleeing = 0
+                sim.cats[i].facing = i == 0 ? 1 : -1
+            }
+            sim.friendCooldown = 0
+            run(0.3)
+            print("selftest: friends: " + sim.cats.map { "\($0.state) facing \(Int($0.facing)) fleeing \(String(format: "%.1f", $0.fleeing))" }.joined(separator: " | "))
+            shot("friends")
+            run(4)
+            for i in 0..<2 where sim.cats[i].ledge != nil {
+                sim.cats[i].state = .sleeping
+                sim.cats[i].timer = 20
+            }
+            run(3.5)
+            print("selftest: napping: " + sim.cats.map { "\($0.state)" }.joined(separator: ", ") + " z's=\(sim.hearts.filter(\.isZ).count)")
+            shot("nap")
+        }
 
         // A window dragged quickly throws its snow off.
         let moved = [WindowInfo(id: 1, rect: windowA.offsetBy(dx: 60, dy: 0)), WindowInfo(id: 2, rect: windowB)]
@@ -214,6 +247,43 @@ enum SelfTest {
         let t0 = Date()
         run(10)
         print(String(format: "selftest: %.3f ms per step", Date().timeIntervalSince(t0) * 1000 / 600))
+        return 0
+    }
+
+    /// `--catsheet <dir>`: the cat in every pose, large, one picture each.
+    static func catSheet(outputDirectory: String) -> Int32 {
+        let poses: [(String, Cat.State, Float)] = [
+            ("walk", .walking, 0), ("sit", .sitting, 0), ("pet", .sitting, 1), ("groom", .grooming, 3), ("groom-back", .grooming, 4), ("lick", .sitting, 5), ("enjoy", .sitting, 6),
+            ("sleep", .sleeping, 0), ("air", .airborne, 0), ("play", .playing, 0), ("dig", .digging, 0),
+            ("flop", .flopped, 0), ("shake", .shaking, 0), ("look", .walking, 2), ("sit-look", .sitting, 2),
+        ]
+        for coat in 0...1 {
+        for (name, state, extra) in poses {
+            let sim = SnowSimulation(size: SIMD2(300, 260), topLimit: 250)
+            var s = Settings()
+            s.intensity = 0.01
+            s.cat = false
+            sim.applySettings(s)
+            var c = Cat(p: SIMD2(150, 40))
+            c.size = 70
+            c.state = state
+            c.phase = 1.2
+            c.coat = coat
+            if extra == 1 { c.petting = 1; c.look = 1 }
+            if extra == 4 { c.groomBack = true }
+            if extra == 5 { c.social = .licking }
+            if extra == 6 { c.social = .licked }
+            if extra == 2 { c.look = 1 }
+            if state == .shaking { c.shake = 1; c.snowy = 0.6 }
+            sim.cat = c
+            guard let device = MTLCreateSystemDefaultDevice(),
+                  let renderer = Renderer(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1, simulation: sim),
+                  let image = renderer.snapshot(width: 300, height: 260, background: MTLClearColor(red: 0.55, green: 0.7, blue: 0.95, alpha: 1))
+            else { return 1 }
+            let rep = NSBitmapImageRep(cgImage: image)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(outputDirectory)/\(coat == 0 ? "cat" : "friend")-\(name).png"))
+        }
+        }
         return 0
     }
 

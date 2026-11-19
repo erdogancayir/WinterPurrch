@@ -4,7 +4,7 @@ import simd
 /// The cat that lives in the snow: it wanders the drifts, climbs onto windows, plays in the snow on the Dock,
 /// fetches coffee, jumps when it is hit and purrs when it is petted.
 struct Cat {
-    enum State { case walking, sitting, sleeping, playing, airborne, away, shaking, flopped, digging }
+    enum State { case walking, sitting, sleeping, playing, airborne, away, shaking, flopped, digging, grooming }
     enum Errand: Equatable { case none, leaving, returning(target: Float, ledge: Int) }
 
     var p: SIMD2<Float>                 // the point on the ground between its feet
@@ -33,6 +33,15 @@ struct Cat {
     var shake: Float = 0                // time left shaking it off
     var fleeing: Float = 0              // time left scurrying away after a fright
     var angle: Float = 0                // tumbling through the air
+    var coat = 0                        // 0 grey-and-white longhair, 1 ginger tabby
+    var groomBack = false               // licking its back rather than a paw
+    enum Social { case none, licking, licked }
+    var social: Social = .none          // washing its friend, or being washed
+    var seeking = false                 // on its way to its friend
+    var stroking: Float = 0             // how long the cursor has been stroking it
+    var look: Float = 0                 // 1 looking at the viewer, 0 looking where it is going
+    var lookTime: Float = 0
+    var lookCooldown: Float = rand(4, 10)
     var spin: Float = 0
     var tumbling = false
 
@@ -42,13 +51,20 @@ struct Cat {
     var pose: Float {
         switch state {
         case .walking, .away: return 0
-        case .sitting: return 1
+        case .sitting:
+            if petting > 0.6 { return 8 }
+            switch social {
+            case .licking: return 11
+            case .licked: return 12
+            case .none: return 1
+            }
         case .sleeping: return 2
         case .airborne: return 3
         case .playing: return 4
         case .shaking: return 5
         case .flopped: return 6
         case .digging: return 7
+        case .grooming: return groomBack ? 10 : 9
         }
     }
 
@@ -72,6 +88,7 @@ struct Mug {
 }
 
 struct Heart {
+    var isZ = false
     var p: SIMD2<Float>
     var v: SIMD2<Float>
     var life: Float = 1
@@ -81,26 +98,36 @@ struct Heart {
 extension SnowSimulation {
     private static let gravity: Float = 1300
 
-    func spawnCat() {
-        var c = Cat(p: SIMD2(size.x * 0.35, size.y * 0.75))
-        c.size = settings.catSize
+    func spawnCat(coat: Int = 0) {
+        var c = Cat(p: SIMD2(size.x * (coat == 0 ? 0.35 : 0.6), size.y * 0.75))
+        c.coat = coat
+        c.size = settings.catSize * (coat == 0 ? 1 : 0.94)
         c.state = .airborne
-        cat = c
+        c.facing = coat == 0 ? 1 : -1
+        cats.append(c)
+    }
+
+    /// Drops a lost cat back in from the top, keeping who it is.
+    private func respawn(_ c: inout Cat, x: Float) {
+        let coat = c.coat, size = c.size
+        c = Cat(p: SIMD2(x, self.size.y + 30))
+        c.coat = coat
+        c.size = size
+        c.state = .airborne
     }
 
     // MARK: - Touch
 
     func creatureUnder(_ point: SIMD2<Float>) -> Bool {
-        if let cat, cat.contains(point) { return true }
+        if cats.contains(where: { $0.contains(point) }) { return true }
         return mugs.contains { simd_distance($0.center, point) < Mug.size * 1.6 }
     }
 
     /// A click: the cat jumps; a mug gets drunk. Returns whether something was there.
     func poke(at point: SIMD2<Float>) -> Bool {
-        if var c = cat, c.contains(point) {
+        if let i = cats.firstIndex(where: { $0.contains(point) }) {
             // A cat already in the air can't be startled again.
-            if c.state != .airborne { startle(&c, from: point.x) }
-            cat = c
+            if cats[i].state != .airborne { startle(&cats[i], from: point.x) }
             return true
         }
         if let i = mugs.firstIndex(where: { simd_distance($0.center, point) < Mug.size * 1.6 }) {
@@ -113,7 +140,8 @@ extension SnowSimulation {
 
     /// A flying snowball reaching the cat or a mug. Returns whether it hit something.
     func hitCreature(at point: SIMD2<Float>, radius: Float, velocity: SIMD2<Float>) -> Bool {
-        if var c = cat, c.state != .away, simd_distance(point, c.center) < radius + c.size * 0.9 {
+        if let i = cats.firstIndex(where: { $0.state != .away && simd_distance(point, $0.center) < radius + $0.size * 0.9 }) {
+            var c = cats[i]
             // Snow in its fur: it stays put and shakes it off (once back on its feet).
             if c.carrying { dropCarriedMug(c) }
             c.carrying = false
@@ -122,7 +150,7 @@ extension SnowSimulation {
             c.startle = 0.6
             c.facing = velocity.x >= 0 ? 1 : -1
             if c.state != .airborne { beginShaking(&c) }
-            cat = c
+            cats[i] = c
             return true
         }
         if let i = mugs.firstIndex(where: { simd_distance($0.center, point) < radius + Mug.size }) {
@@ -136,6 +164,8 @@ extension SnowSimulation {
 
     /// A fright from `x`: a short hop straight up with its fur on end, then a dash the other way.
     private func startle(_ c: inout Cat, from x: Float) {
+        c.social = .none
+        c.seeking = false
         if c.carrying { dropCarriedMug(c) }
         c.carrying = false
         c.errand = .none
@@ -169,6 +199,11 @@ extension SnowSimulation {
         }
         if c.shake <= 0 {
             c.snowy = 0
+            if Float.random(in: 0..<1) < 0.6 {
+                // Then puts its fur straight.
+                startGrooming(&c)
+                return
+            }
             c.state = .walking
             c.facing = -c.facing
             c.fleeing = rand(0.5, 0.9)
@@ -187,7 +222,15 @@ extension SnowSimulation {
     func updateCat(_ dt: Float, _ active: [Ledge]) {
         updateMugs(dt, active)
         updateHearts(dt)
-        guard var c = cat else { return }
+        for i in cats.indices {
+            var c = cats[i]
+            step(&c, dt, active)
+            cats[i] = c
+        }
+        socialize(dt)
+    }
+
+    private func step(_ c: inout Cat, _ dt: Float, _ active: [Ledge]) {
         c.blinkTimer -= dt
         if c.blinkTimer < 0 {
             c.blink = 1
@@ -206,7 +249,166 @@ extension SnowSimulation {
         default: grounded(&c, dt, active)
         }
         pet(&c, dt)
-        cat = c
+    }
+
+    // MARK: - Friends
+
+    /// Two cats that are friends: they look for each other, and when they meet they touch noses, wash each other,
+    /// curl up together for a nap, play-fight or play tag. One sometimes tags along after the other.
+    private func socialize(_ dt: Float) {
+        guard cats.count >= 2 else { return }
+        friendCooldown -= dt
+        friendSeek -= dt
+        var a = cats[0], b = cats[1]
+        defer {
+            cats[0] = a
+            cats[1] = b
+        }
+        let settled: Set<Cat.State> = [.walking, .sitting]
+        let free = { (c: Cat) in c.ledge != nil && settled.contains(c.state) && c.errand == .none && c.fleeing <= 0 && c.petting < 0.3 }
+        guard free(a), free(b) else { return }
+
+        // Apart for a while, one goes to find the other.
+        let apart = a.ledge != b.ledge || abs(b.p.x - a.p.x) > (a.size + b.size) * 3
+        if apart {
+            guard friendSeek <= 0 else { return }
+            friendSeek = rand(30, 60)
+            if Bool.random() { seek(&a, b) } else { seek(&b, a) }
+            friendCooldown = min(friendCooldown, 0)
+            return
+        }
+        guard let ledgeID = a.ledge, let l = ledges[ledgeID] else { return }
+        let dx = b.p.x - a.p.x
+        let side: Float = dx >= 0 ? 1 : -1
+
+        // One heads off and the other tags along behind.
+        if friendCooldown > 0 && a.state != b.state && Float.random(in: 0..<1) < dt * 0.08 {
+            if a.state == .walking { follow(&b, a) } else { follow(&a, b) }
+            return
+        }
+
+        let near = abs(dx) < (a.size + b.size) * 1.2
+        guard near else { return }
+        if friendCooldown <= 0 {
+            friendCooldown = rand(18, 35)
+            a.seeking = false
+            b.seeking = false
+            let roll = Float.random(in: 0..<1)
+            if roll < 0.22 {
+                // Nose to nose, with a heart between them.
+                placeSideBySide(&a, &b, side: side, gap: 0.62, on: l)
+                for i in 0..<2 {
+                    var c = i == 0 ? a : b
+                    c.state = .sitting
+                    c.social = .none
+                    c.timer = rand(3, 4.5)
+                    c.facing = i == 0 ? side : -side
+                    if i == 0 { a = c } else { b = c }
+                }
+                heartsBetween(a, b, 3)
+            } else if roll < 0.45 {
+                // One washes the other's head; the other shuts its eyes and enjoys it.
+                placeSideBySide(&a, &b, side: side, gap: 0.5, on: l)
+                let first = Bool.random()
+                var groomer = first ? a : b, groomed = first ? b : a
+                let toward: Float = first ? side : -side
+                groomer.state = .sitting
+                groomer.social = .licking
+                groomer.facing = toward
+                groomer.timer = rand(4, 6)
+                groomed.state = .sitting
+                groomed.social = .licked
+                groomed.facing = -toward
+                groomed.timer = groomer.timer
+                if first { a = groomer; b = groomed } else { b = groomer; a = groomed }
+                heartsBetween(a, b, 1)
+            } else if roll < 0.63 {
+                // Curled up together, heads in the middle.
+                placeSideBySide(&a, &b, side: side, gap: 0.46, on: l)
+                let nap = rand(18, 30)
+                for i in 0..<2 {
+                    var c = i == 0 ? a : b
+                    c.state = .sleeping
+                    c.timer = nap
+                    c.facing = i == 0 ? side : -side
+                    if i == 0 { a = c } else { b = c }
+                }
+            } else if roll < 0.8 {
+                // Play-fighting: crouched face to face, batting and pouncing.
+                placeSideBySide(&a, &b, side: side, gap: 0.8, on: l)
+                for i in 0..<2 {
+                    var c = i == 0 ? a : b
+                    c.state = .playing
+                    c.timer = rand(3, 5)
+                    c.swatTimer = rand(0.1, 0.4)
+                    c.facing = i == 0 ? side : -side
+                    if i == 0 { a = c } else { b = c }
+                }
+            } else {
+                // Tag: one bolts, the other gives chase.
+                let runner = Bool.random()
+                var r = runner ? a : b, chaser = runner ? b : a
+                let away: Float = runner ? -side : side
+                r.state = .walking
+                r.facing = away
+                r.fleeing = rand(1.8, 2.6)
+                chaser.state = .walking
+                chaser.facing = away
+                chaser.fleeing = r.fleeing + 0.3
+                if runner { a = r; b = chaser } else { b = r; a = chaser }
+            }
+            return
+        }
+        // Walking into its friend, it turns aside.
+        if a.state == .walking && !a.seeking && a.facing == side && abs(dx) < (a.size + b.size) * 0.7 { a.facing = -side }
+        if b.state == .walking && !b.seeking && b.facing == -side && abs(dx) < (a.size + b.size) * 0.7 { b.facing = side }
+    }
+
+    /// Walks over to its friend, or leaps up to the ledge its friend is on.
+    private func seek(_ c: inout Cat, _ friend: Cat) {
+        c.seeking = true
+        c.social = .none
+        if c.ledge == friend.ledge {
+            c.state = .walking
+            c.facing = friend.p.x >= c.p.x ? 1 : -1
+            c.timer = 15
+            return
+        }
+        guard let id = friend.ledge, let l = ledges[id] else { return }
+        let side: Float = c.p.x <= friend.p.x ? -1 : 1
+        let x = min(max(friend.p.x + side * (c.size + friend.size) * 0.7, l.x0 + c.size), l.x0 + l.width - c.size)
+        guard let col = l.column(at: x), l.visible[col] else { return }
+        let rise = l.y - c.p.y
+        if abs(x - c.p.x) < 420 && rise < 340 {
+            jump(&c, to: SIMD2(x, l.y + l.h[col]))
+        } else {
+            // Too far to leap: head that way and see.
+            c.state = .walking
+            c.facing = friend.p.x >= c.p.x ? 1 : -1
+            c.timer = 6
+            c.descend = l.y < c.p.y
+        }
+    }
+
+    private func follow(_ c: inout Cat, _ leader: Cat) {
+        c.state = .walking
+        c.social = .none
+        c.facing = leader.facing
+        c.timer = leader.timer + rand(0.2, 0.8)
+    }
+
+    private func placeSideBySide(_ a: inout Cat, _ b: inout Cat, side: Float, gap: Float, on l: Ledge) {
+        let middle = (a.offset + b.offset) / 2
+        let half = (a.size + b.size) * gap
+        a.offset = min(max(middle - side * half, 0), l.width)
+        b.offset = min(max(middle + side * half, 0), l.width)
+    }
+
+    private func heartsBetween(_ a: Cat, _ b: Cat, _ count: Int) {
+        let mid = (a.center + b.center) / 2 + SIMD2(0, a.size * 1.2)
+        for k in 0..<count {
+            hearts.append(Heart(p: mid + SIMD2(rand(-6, 6), Float(k) * 6), v: SIMD2(rand(-10, 10), rand(28, 42))))
+        }
     }
 
     private func fly(_ c: inout Cat, _ dt: Float, _ active: [Ledge]) {
@@ -241,11 +443,7 @@ extension SnowSimulation {
                 c.timer = rand(0.8, 1.6)
             }
         }
-        if c.p.y < -80 {
-            c = Cat(p: SIMD2(rand(0.2, 0.8) * size.x, size.y + 30))
-            c.size = settings.catSize
-            c.state = .airborne
-        }
+        if c.p.y < -80 { respawn(&c, x: rand(0.2, 0.8) * size.x) }
     }
 
     private func settle(_ c: inout Cat, on l: Ledge) {
@@ -258,8 +456,7 @@ extension SnowSimulation {
         c.timer -= dt
         guard c.timer <= 0 else { return }
         guard let ground = ledges[Self.groundID] else {
-            c = Cat(p: SIMD2(size.x * 0.5, size.y + 30))
-            c.size = settings.catSize
+            respawn(&c, x: size.x * 0.5)
             return
         }
         // Back from the kitchen with a mug, from either side, to somewhere new each time.
@@ -305,6 +502,16 @@ extension SnowSimulation {
         case .sitting: sit(&c, l, dt, active)
         case .sleeping:
             c.timer -= dt
+            if c.timer <= 0 { c.stroking = 0 }
+            // Little z's drift up from a sleeping cat.
+            c.swatTimer -= dt
+            if c.swatTimer <= 0 {
+                c.swatTimer = rand(1.1, 1.6)
+                let head = c.p + SIMD2(c.facing * c.size * 0.75, c.size * 1.0)
+                var z = Heart(p: head, v: SIMD2(c.facing * rand(6, 12), rand(16, 24)))
+                z.isZ = true
+                hearts.append(z)
+            }
             if c.timer <= 0 {
                 c.state = .sitting
                 c.timer = 1.5
@@ -319,6 +526,12 @@ extension SnowSimulation {
                 beginShaking(&c)
             }
         case .digging: dig(&c, l, dt)
+        case .grooming:
+            c.timer -= dt
+            if c.timer <= 0 {
+                c.state = .sitting
+                c.timer = rand(1, 2)
+            }
         default: break
         }
         guard c.state != .airborne, c.state != .away, c.ledge == l.id else { return }
@@ -437,7 +650,11 @@ extension SnowSimulation {
 
     private func sit(_ c: inout Cat, _ l: Ledge, _ dt: Float, _ active: [Ledge]) {
         c.timer -= dt
+        if c.social != .none, Float.random(in: 0..<1) < dt * 2 {
+            heartsAbove(c)
+        }
         guard c.timer <= 0, c.petting < 0.5 else { return }
+        c.social = .none
         let roll = Float.random(in: 0..<1)
         if c.nextCoffee <= 0 && l.kind == .ground && mugs.count < 5 {
             c.errand = .leaving
@@ -451,6 +668,8 @@ extension SnowSimulation {
             } else {
                 wander(&c)
             }
+        } else if Float.random(in: 0..<1) < 0.22 {
+            startGrooming(&c)
         } else if l.kind == .dock && snowy(l) && roll < 0.3 {
             startPlaying(&c)
         } else if roll < 0.45, depth(under: c, on: l) > 3 {
@@ -460,9 +679,9 @@ extension SnowSimulation {
             wander(&c)
         } else if roll < 0.2, let target = climbTarget(from: c, active) {
             jump(&c, to: target)
-        } else if roll < 0.3 {
+        } else if roll < 0.42 {
             c.state = .sleeping
-            c.timer = rand(12, 25)
+            c.timer = rand(15, 35)
         } else {
             wander(&c)
         }
@@ -498,6 +717,17 @@ extension SnowSimulation {
         let x = l.x0 + c.offset
         kick(at: SIMD2(x - c.size * 0.5, c.p.y), toward: -1, amount: 16, on: l)
         kick(at: SIMD2(x + c.size * 0.5, c.p.y), toward: 1, amount: 16, on: l)
+    }
+
+    private func heartsAbove(_ c: Cat) {
+        guard c.social == .licked else { return }
+        hearts.append(Heart(p: c.center + SIMD2(0, c.size * 1.3), v: SIMD2(rand(-8, 8), rand(25, 35))))
+    }
+
+    private func startGrooming(_ c: inout Cat) {
+        c.state = .grooming
+        c.groomBack = Bool.random()
+        c.timer = rand(3, 6)
     }
 
     private func startDigging(_ c: inout Cat) {
@@ -656,13 +886,37 @@ extension SnowSimulation {
     // MARK: - Petting
 
     private func pet(_ c: inout Cat, _ dt: Float) {
-        guard let cur = cursor, c.contains(cur), simd_length(cursorVelocity) < 80, c.fleeing <= 0,
+        // Sitting, it raises a paw to a cursor that comes close without touching it.
+        // Glances at the viewer now and then; looks when petted, startled or snowed on.
+        c.lookCooldown -= dt
+        c.lookTime -= dt
+        if c.lookCooldown <= 0 {
+            c.lookTime = rand(1.5, 3.5)
+            c.lookCooldown = rand(8, 18)
+        }
+        let attentive = c.petting > 0.3 || c.startle > 0.5 || c.state == .shaking
+        let target: Float = attentive || c.lookTime > 0 ? 1 : 0
+        c.look += (target - c.look) * min(1, dt * 6)
+
+        // Resting the cursor on it, or stroking it back and forth; a cursor flying past doesn't count.
+        let speed = simd_length(cursorVelocity)
+        guard let cur = cursor, c.contains(cur), speed < 1100, c.fleeing <= 0,
               c.state == .sitting || c.state == .walking || c.state == .sleeping || c.state == .playing
         else {
             c.petting = max(0, c.petting - dt)
+            c.stroking = max(0, c.stroking - dt * 0.5)
             return
         }
         c.petting += dt
+        if speed > 40 { c.stroking += dt }
+        // Stroked long enough, it purrs itself to sleep.
+        if c.stroking > 2.5 && c.state != .sleeping {
+            c.state = .sleeping
+            c.timer = rand(20, 35)
+            c.social = .none
+            c.swatTimer = 0.4
+        }
+        if c.state == .sleeping { c.timer = max(c.timer, 8) }
         guard c.petting > 0.6 else { return }
         if c.state == .walking || c.state == .playing {
             c.state = .sitting

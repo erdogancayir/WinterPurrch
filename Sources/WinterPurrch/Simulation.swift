@@ -15,7 +15,8 @@ struct Settings {
     var melt = false
     var blizzard = false
     var cat = true
-    var catSize: Float = 32
+    var friend = true
+    var catSize: Float = 42
 }
 
 /// A falling or flying bit of snow.
@@ -110,7 +111,20 @@ final class SnowSimulation {
     private(set) var balls: [Snowball] = []
     /// The cat lives on one screen only; this one hosts it when `hostsCat` is set.
     var hostsCat = false
-    var cat: Cat?
+    var cats: [Cat] = []
+    var friendCooldown: Float = 15
+    var friendSeek: Float = 20
+    /// The first cat, for code that deals with one.
+    var cat: Cat? {
+        get { cats.first }
+        set {
+            if let newValue {
+                if cats.isEmpty { cats.append(newValue) } else { cats[0] = newValue }
+            } else {
+                cats.removeAll()
+            }
+        }
+    }
     var mugs: [Mug] = []
     var hearts: [Heart] = []
     private var stash: [Int: [Float]] = [:]
@@ -156,9 +170,11 @@ final class SnowSimulation {
         settings = s
         if old.ground != s.ground { rebuildGround() }
         Mug.size = s.catSize * 0.42
-        if hostsCat && s.cat && cat == nil { spawnCat() }
-        cat?.size = s.catSize
-        if !s.cat { cat = nil }
+        // The grey longhair, and its friend the ginger tabby.
+        let wanted = hostsCat && s.cat ? (s.friend ? 2 : 1) : 0
+        while cats.count > wanted { cats.removeLast() }
+        while cats.count < wanted { spawnCat(coat: cats.count) }
+        for i in cats.indices { cats[i].size = s.catSize * (cats[i].coat == 0 ? 1 : 0.94) }
         if old.windows && !s.windows {
             for (id, l) in ledges where l.kind == .window {
                 drop(l, fraction: 1, velocity: .zero)

@@ -92,21 +92,149 @@ float sdHeart(float2 p) {
 // Premultiplied "over".
 float4 over(float4 dst, float3 c, float a) { return float4(c * a + dst.rgb * (1.0 - a), a + dst.a * (1.0 - a)); }
 
-// The cat, side on. Units are the cat's size; y = 0 is the ground under its feet.
-// ex: x blink, y startle, z moving, w pose (0 walk, 1 sit, 2 sleep, 3 airborne, 4 playing).
+// The cat: a fluffy grey-and-white kitten with big eyes. Units are the cat's size; y = 0 is the ground under its feet.
+// The body is seen side on and the face always turns to the viewer; sitting, it faces the viewer entirely.
+// ex: x blink, y startle, z moving, w pose (0 walk, 1 sit, 2 sleep, 3 airborne, 4 playing, 5 shaking, 6 flopped,
+// 7 digging, 8 petted). ex2: x shake, y snow in its fur, z tumble angle.
+struct Coat { float3 main; float3 dark; float3 white; float3 iris; float3 irisLight; float fluff; float stripes; float blaze; float chub; };
+
+// 0: the grey-and-white longhair. 1: its friend, a chubby ginger tabby with short fur and amber eyes.
+Coat coatFor(float i) {
+    Coat k;
+    if (i < 0.5) {
+        k.main = float3(0.58, 0.59, 0.63); k.dark = float3(0.43, 0.44, 0.48); k.white = float3(0.985, 0.98, 0.97);
+        k.iris = float3(0.27, 0.55, 0.53); k.irisLight = float3(0.47, 0.78, 0.7);
+        k.fluff = 1.0; k.stripes = 0.0; k.blaze = 1.0; k.chub = 1.0;
+    } else {
+        k.main = float3(0.98, 0.67, 0.34); k.dark = float3(0.84, 0.46, 0.17); k.white = float3(1.0, 0.96, 0.9);
+        k.iris = float3(0.76, 0.5, 0.08); k.irisLight = float3(0.98, 0.8, 0.32);
+        k.fluff = 0.3; k.stripes = 1.0; k.blaze = 0.0; k.chub = 1.1;
+    }
+    return k;
+}
+constant float3 catPink = float3(0.97, 0.7, 0.73);
+constant float3 catLine = float3(0.3, 0.3, 0.35);
+
+// A soft, tufted edge: pushes an outline out and in around `c`.
+float fur(float2 p, float2 c, float k) {
+    float2 d = p - c;
+    float a = atan2(d.y, d.x);
+    float t = 0.5 + 0.5 * sin(a * k + sin(a * 3.0) * 2.0);
+    return t * t * (3.0 - 2.0 * t) * 0.7;   // rounded tufts rather than spikes
+}
+
+float catEars(float2 q, float2 hc, float s) {
+    float l = sdTriangle(q, hc + float2(-0.43, 0.12) * s, hc + float2(-0.36, 0.68) * s, hc + float2(-0.05, 0.4) * s);
+    float r = sdTriangle(q, hc + float2(0.05, 0.4) * s, hc + float2(0.36, 0.68) * s, hc + float2(0.43, 0.12) * s);
+    return min(l, r) - 0.045 * s;
+}
+
+float catInnerEars(float2 q, float2 hc, float s) {
+    float l = sdTriangle(q, hc + float2(-0.35, 0.22) * s, hc + float2(-0.32, 0.56) * s, hc + float2(-0.13, 0.4) * s);
+    float r = sdTriangle(q, hc + float2(0.13, 0.4) * s, hc + float2(0.32, 0.56) * s, hc + float2(0.35, 0.22) * s);
+    return min(l, r) - 0.02 * s;
+}
+
+float catHead(float2 q, float2 hc, float s, Coat k) {
+    float round = length(q - hc) - 0.44 * s;
+    float cheeks = sdEll(q, hc + float2(0.0, -0.1) * s, float2(0.53, 0.35) * s);
+    return min(round, cheeks) - 0.03 * s * k.fluff * fur(q, hc, 18.0);
+}
+
+float4 catFace(float4 o, float2 q, float2 fc, float s, float blink, float startle, bool happy, bool tongue, float px, Coat k, float turn) {
+    // Turned away from the viewer, the face slides towards the front of the head and the far eye narrows.
+    fc += float2(0.26 * turn, -0.02 * turn) * s;
+    o = over(o, k.white, fillA(sdEll(q, fc + float2(0.0, -0.17) * s, float2(0.31 - 0.08 * turn, 0.21) * s), px * 2.0));
+    o = over(o, k.white, fillA(sdEll(q, fc + float2(0.0, 0.08) * s, float2(0.07, 0.3) * s), px * 3.0) * k.blaze);
+    float2 look = float2(0.03 * turn, 0.0) * s;
+    for (int i = 0; i < 2; i++) {
+        float sx = i == 0 ? -1.0 : 1.0;
+        float far = i == 0 ? turn * 1.15 : 0.0;       // the eye further from where it is looking
+        float2 e = fc + float2(sx * 0.17 * (1.0 - 0.3 * turn) + 0.04 * far, 0.04) * s;
+        o = over(o, float3(0.98, 0.6, 0.65), fillA(length(q - (fc + float2(sx * 0.26 * (1.0 - 0.3 * turn), -0.14) * s)) - 0.065 * s * (1.0 - 0.4 * far), px * 4.0) * 0.4);
+        if (happy) {
+            float2 ac = e + float2(0.0, -0.04) * s;
+            float arc = max(abs(length((q - ac) / float2(1.0 - 0.45 * far, 1.0)) - 0.07 * s) - 0.014 * s, ac.y - q.y);
+            o = over(o, catLine, fillA(arc, px));
+            continue;
+        }
+        float2 er = float2(0.115 * (1.0 - 0.5 * far), 0.13) * s * (1.0 + 0.12 * startle);
+        float sclera = sdEll(q, e, er);
+        o = over(o, float3(0.2, 0.2, 0.25), fillA(sclera - 0.016 * s, px));
+        o = over(o, float3(1.0), fillA(sclera, px));
+        float2 ic = e + float2(0.0, 0.012) * s + look;
+        float2 d = (q - ic) / float2(1.0 - 0.45 * far, 1.0);
+        float r = length(d);
+        o = over(o, k.iris, fillA(max(r - 0.09 * s, sclera), px));
+        o = over(o, k.irisLight, fillA(max(r - 0.062 * s, sclera), px * 3.0) * 0.7);
+        o = over(o, float3(0.05, 0.06, 0.08), fillA(max(r - (0.05 + 0.02 * startle) * s, sclera), px));
+        o = over(o, float3(1.0), fillA(length(q - (ic + float2(0.032, 0.037) * s)) - 0.027 * s * (1.0 - 0.4 * far), px));
+        o = over(o, float3(1.0), fillA(length(q - (ic + float2(-0.028, -0.032) * s)) - 0.013 * s, px));
+        if (blink > 0.01) {
+            float lid = max(sclera - 0.018 * s, e.y + er.y * (1.0 - 2.0 * blink) - q.y);
+            o = over(o, k.main, fillA(lid, px));
+        }
+    }
+    float2 nc = fc + float2(0.03 * turn, 0.0) * s;
+    float nose = sdTriangle(q, nc + float2(-0.05, -0.065) * s, nc + float2(0.05, -0.065) * s, nc + float2(0.0, -0.112) * s);
+    o = over(o, float3(0.92, 0.52, 0.58), fillA(nose - 0.016 * s, px));
+    float2 m1 = nc + float2(-0.046 * (1.0 - 0.4 * turn), -0.125) * s, m2 = nc + float2(0.046, -0.125) * s;
+    float w = min(abs(length(q - m1) - 0.046 * s * (1.0 - 0.4 * turn)), abs(length(q - m2) - 0.046 * s)) - 0.011 * s;
+    w = max(w, q.y - (nc.y - 0.125 * s));
+    o = over(o, float3(0.38, 0.26, 0.27), fillA(w, px));
+    if (tongue) {
+        o = over(o, float3(0.95, 0.48, 0.56), fillA(sdEll(q, nc + float2(0.0, -0.205) * s, float2(0.05, 0.065) * s), px));
+    }
+    for (int i = 0; i < 2; i++) {
+        float sx = i == 0 ? -1.0 : 1.0;
+        float len = i == 0 ? 1.0 - 0.6 * turn : 1.0;
+        float2 a = nc + float2(sx * 0.2 * (1.0 - 0.3 * turn), -0.15) * s;
+        float wh = min(segDist(q, a, a + float2(sx * 0.34, 0.06) * s * len),
+                       segDist(q, a + float2(0.0, -0.03) * s, a + float2(sx * 0.32, -0.07) * s * len));
+        o = over(o, float3(0.86, 0.86, 0.9), fillA(wh - 0.007 * s, px) * 0.85);
+    }
+    return o;
+}
+
+float4 catHeadFull(float4 o, float2 q, float2 hc, float s, float blink, float startle, bool happy, bool tongue, float px, Coat k, float turn) {
+    float head = catHead(q, hc, s, k);
+    float ears = catEars(q, hc, s);
+    o = over(o, catLine, fillA(min(head, ears) - 0.025 * s, px) * 0.9);
+    o = over(o, k.main, fillA(ears, px));
+    o = over(o, catPink, fillA(catInnerEars(q, hc, s), px));
+    float shade = 0.92 + 0.08 * smoothstep(hc.y - 0.4 * s, hc.y + 0.4 * s, q.y);
+    o = over(o, k.main * shade, fillA(head, px));
+    if (k.stripes > 0.5) {
+        // Tabby markings: an "M" on the forehead and stripes on the cheeks.
+        float m = 1e3;
+        for (int i = -1; i <= 1; i++) {
+            float x = float(i) * 0.11 + 0.12 * turn;
+            m = min(m, segDist(q, hc + float2(x, 0.17) * s, hc + float2(x * 0.8, 0.36) * s));
+        }
+        for (int i = 0; i < 2; i++) {
+            float sx = i == 0 ? -1.0 : 1.0;
+            m = min(m, segDist(q, hc + float2(sx * 0.5, -0.02) * s, hc + float2(sx * 0.36, 0.0) * s));
+        }
+        o = over(o, k.dark, fillA(max(m - 0.028 * s, head), px * 2.0) * 0.85);
+    }
+    return catFace(o, q, hc, s, blink, startle, happy, tongue, px, k, turn);
+}
+
 float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4 ex2, float time) {
+    Coat k = coatFor(floor(ex2.w + 0.001));
+    // How far the head is turned away from the viewer, towards where it is going.
+    float turn = 1.0 - clamp(fract(ex2.w) * 2.0, 0.0, 1.0);
     float2 q = float2(uv.x * facing, uv.y + 1.0);
-    // Tumbling: turn the whole cat about its middle.
     if (ex2.z != 0.0) {
         float2 c0 = float2(0.0, 0.75);
         float ca = cos(ex2.z), sa = sin(ex2.z);
         float2 d = q - c0;
         q = c0 + float2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
     }
-    // Shaking snow off: everything above the paws whips from side to side.
     float shaking = ex2.x;
     q.x += sin(time * 44.0) * 0.11 * shaking * smoothstep(0.15, 0.9, q.y);
     q.y += abs(sin(time * 44.0)) * 0.03 * shaking * smoothstep(0.15, 0.9, q.y);
+
     float pose = ex.w;
     bool sit = abs(pose - 1.0) < 0.5;
     bool sleep = abs(pose - 2.0) < 0.5;
@@ -114,136 +242,182 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
     bool play = abs(pose - 4.0) < 0.5;
     bool flop = abs(pose - 6.0) < 0.5;
     bool dig = abs(pose - 7.0) < 0.5;
+    bool pet = abs(pose - 8.0) < 0.5;
+    bool groom = abs(pose - 9.0) < 0.5;       // licking a paw and washing its face
+    bool groomBack = abs(pose - 10.0) < 0.5;  // turned round, licking its back
+    bool lick = abs(pose - 11.0) < 0.5;       // washing its friend's head
+    bool enjoy = abs(pose - 12.0) < 0.5;      // being washed, eyes shut
     float sway = sin(time * 2.3);
-
-    float2 bc = float2(0.0, 0.72), br = float2(0.78, 0.36);
-    float2 hc = float2(0.8, 1.05);
-    float hr = 0.34;
-    if (sit)   { bc = float2(-0.18, 0.6); br = float2(0.48, 0.58); hc = float2(0.12, 1.32); }
-    if (sleep) { bc = float2(0.0, 0.36); br = float2(0.82, 0.36); hc = float2(0.66, 0.42); }
-    if (air)   { bc = float2(0.0, 0.85); br = float2(0.9, 0.31) * (1.0 + 0.12 * ex.y); hc = float2(0.92, 1.12); }
-    if (play)  { bc = float2(-0.05, 0.56); br = float2(0.8, 0.32); hc = float2(0.78, 0.66); }
-    if (dig)   { bc = float2(-0.05, 0.56); br = float2(0.8, 0.32); hc = float2(0.8, 0.5); }
-    if (flop)  { bc = float2(0.0, 0.33); br = float2(0.84, 0.32); hc = float2(0.86, 0.36); }
-
-    float body = sdEll(q, bc, br);
-    if (play || dig) body = min(body, sdEll(q, float2(-0.52, 0.76), float2(0.36, 0.34)));
-    float head = length(q - hc) - hr;
-    float earL = sdTriangle(q, hc + float2(-0.30, 0.14), hc + float2(-0.22, 0.52), hc + float2(-0.02, 0.30));
-    float earR = sdTriangle(q, hc + float2(0.04, 0.32), hc + float2(0.24, 0.52), hc + float2(0.30, 0.12));
-
-    float legsNear = 1e3, legsFar = 1e3;
-    if (!sit && !sleep && !flop) {
-        float hipY = bc.y - br.y * 0.35;
-        for (int i = 0; i < 4; i++) {
-            float hx = (i == 0) ? -0.5 : (i == 1) ? -0.3 : (i == 2) ? 0.38 : 0.56;
-            float off = (i == 0 || i == 3) ? 0.0 : 3.14159;
-            float2 hip = float2(hx, hipY);
-            float s = sin(phase + off) * ex.z;
-            float2 foot = float2(hx + s * 0.22, 0.05 + max(0.0, cos(phase + off)) * 0.1 * ex.z);
-            if (air) foot = hip + (i < 2 ? float2(-0.4, -0.28) : float2(0.4, -0.28));
-            if (play) {
-                hip.y = (i < 2) ? 0.66 : 0.45;
-                if (i == 2) foot = float2(0.62 + 0.32 * max(0.0, sin(phase)), 0.05 + 0.38 * max(0.0, sin(phase)));
-                else if (i == 3) foot = float2(0.7, 0.04);
-                else foot = float2(hx, 0.04);
-            }
-            if (dig) {
-                hip.y = (i < 2) ? 0.66 : 0.42;
-                float ph = phase + (i == 2 ? 0.0 : 3.14159);
-                if (i >= 2) foot = float2(0.68 + 0.16 * sin(ph), 0.03 + 0.2 * max(0.0, sin(ph)));
-                else foot = float2(hx, 0.04);
-            }
-            float dl = segDist(q, hip, foot) - 0.085;
-            if (i == 0 || i == 2) legsNear = min(legsNear, dl); else legsFar = min(legsFar, dl);
-        }
-    }
-    if (flop) {
-        // On its back-ish, paws up and splayed.
-        for (int i = 0; i < 4; i++) {
-            float hx = (i == 0) ? -0.5 : (i == 1) ? -0.3 : (i == 2) ? 0.35 : 0.55;
-            float wob = sin(time * 3.0 + float(i)) * 0.04;
-            float2 hip = float2(hx, 0.5);
-            float2 foot = float2(hx + 0.18 * (i < 2 ? -1.0 : 1.0) + wob, 0.92 + 0.08 * float(i % 2));
-            float dl = segDist(q, hip, foot) - 0.085;
-            if (i == 0 || i == 2) legsNear = min(legsNear, dl); else legsFar = min(legsFar, dl);
-        }
-    }
-    if (sit) {
-        legsNear = min(legsNear, segDist(q, float2(0.18, 0.62), float2(0.2, 0.05)) - 0.08);
-        legsFar = min(legsFar, segDist(q, float2(0.02, 0.62), float2(0.04, 0.05)) - 0.08);
-        legsNear = min(legsNear, sdEll(q, float2(-0.32, 0.09), float2(0.24, 0.1)));
-    }
-
-    float2 t0, t1, t2;
-    if (sit) { t0 = float2(-0.55, 0.12); t1 = float2(-0.9, 0.1); t2 = float2(-1.12, 0.28 + 0.1 * sway); }
-    else if (sleep) { t0 = float2(-0.78, 0.25); t1 = float2(-0.55, 0.06); t2 = float2(0.25, 0.07); }
-    else if (flop) { t0 = float2(-0.78, 0.3); t1 = float2(-1.08, 0.16); t2 = float2(-1.32, 0.1 + 0.05 * sway); }
-    else {
-        t0 = bc + float2(-br.x * 0.9, br.y * 0.3);
-        t1 = t0 + float2(-0.32, 0.32 + 0.08 * sway);
-        t2 = t1 + float2(-0.06 + 0.15 * sway, 0.34);
-        if (air) { t1 = t0 + float2(-0.4, 0.15); t2 = t1 + float2(-0.3, 0.1 + 0.3 * ex.y); }
-        if (play || dig) { t1 = t0 + float2(-0.3, 0.4 + 0.1 * sin(time * 9.0)); t2 = t1 + float2(-0.1 + 0.2 * sin(time * 9.0), 0.3); }
-    }
-    float tail = min(segDist(q, t0, t1), segDist(q, t1, t2)) - (0.075 + 0.06 * ex.y);
-
-    float D = min(min(min(body, head), min(earL, earR)), min(min(legsNear, legsFar), tail));
-    float3 ink = float3(0.22, 0.12, 0.07);
-    float3 fur = float3(0.96, 0.62, 0.27);
-    float3 furDark = float3(0.78, 0.43, 0.16);
-    float stripes = smoothstep(0.35, 0.8, sin(q.x * 13.0 + q.y * 2.0));
-
     float4 o = float4(0);
-    o = over(o, ink, fillA(D - 0.05, px));
-    o = over(o, furDark * 0.9, fillA(legsFar, px));
-    o = over(o, mix(fur, furDark, stripes * 0.8), fillA(tail, px));
-    float3 bodyCol = mix(fur, furDark, stripes * 0.7);
-    float belly = smoothstep(bc.y - br.y * 0.2, bc.y - br.y * 0.85, q.y);
-    bodyCol = mix(bodyCol, float3(1.0, 0.93, 0.82), belly * 0.65);
-    o = over(o, bodyCol, fillA(body, px));
-    o = over(o, ink, fillA(legsNear - 0.035, px));
-    o = over(o, fur, fillA(legsNear, px));
-    o = over(o, ink, fillA(head - 0.04, px));
-    float brow = smoothstep(0.4, 0.9, sin((q.x - hc.x) * 22.0)) * step(hc.y + 0.14, q.y);
-    o = over(o, mix(fur, furDark, brow * 0.7), fillA(head, px));
-    // Clumps of snow stuck in the fur, mostly on its back and head.
-    if (ex2.y > 0.01) {
-        float2 cell = floor(q * 3.6);
-        float2 f = fract(q * 3.6) - 0.5 - (float2(hash21(cell + 1.3), hash21(cell + 5.9)) - 0.5) * 0.3;
-        float n = hash21(cell + 3.1);
-        float blob = length(f * float2(1.0, 1.4)) - (0.36 + 0.16 * hash21(cell + 9.7));
-        float onTop = smoothstep(bc.y - 0.05, bc.y + br.y * 0.6, q.y) + step(hc.y - 0.1, q.y) * step(length(q - hc), hr);
-        float stuck = step(n, ex2.y * 0.95) * clamp(onTop, 0.0, 1.0) * fillA(min(body, head), px);
-        o = over(o, float3(0.97, 0.98, 1.0), fillA(blob, px * 3.6) * stuck);
-    }
-    o = over(o, ink, fillA(min(earL, earR) - 0.035, px));
-    o = over(o, fur, fillA(min(earL, earR), px));
-    float inL = sdTriangle(q, hc + float2(-0.25, 0.2), hc + float2(-0.21, 0.42), hc + float2(-0.08, 0.3));
-    float inR = sdTriangle(q, hc + float2(0.08, 0.32), hc + float2(0.21, 0.43), hc + float2(0.25, 0.18));
-    o = over(o, float3(0.98, 0.66, 0.66), fillA(min(inL, inR), px));
 
-    float2 mz = hc + float2(0.17, -0.12);
-    o = over(o, float3(1.0, 0.95, 0.88), fillA(sdEll(q, mz, float2(0.16, 0.1)), px));
-    float closed = (sleep || flop) ? 1.0 : ex.x;
-    float eyeH = mix(0.075, 0.014, closed);
-    float2 e1 = hc + float2(0.03, 0.07), e2 = hc + float2(0.21, 0.08);
-    float eyes = min(sdEll(q, e1, float2(0.05, eyeH)), sdEll(q, e2, float2(0.045, eyeH)));
-    if (ex.y > 0.5 && !sleep) eyes = min(length(q - e1) - 0.08, length(q - e2) - 0.072);
-    o = over(o, float3(0.1, 0.13, 0.08), fillA(eyes, px));
-    if (closed < 0.5) {
-        float shine = min(length(q - e1 - float2(0.015, 0.025)) - 0.018, length(q - e2 - float2(0.015, 0.025)) - 0.016);
-        o = over(o, float3(1.0), fillA(shine, px));
+    if (sit || pet || groom || lick || enjoy) {
+        // Sitting up, facing the viewer.
+        float2 hc = float2(0.0, 1.5);
+        float s = 1.1;
+        if (lick) hc += float2(0.2, -0.06);      // leaning in to its friend
+        if (enjoy) hc += float2(0.1, -0.04);     // tilting its head into it
+        float body = min(sdEll(q, float2(0.0, 0.52), float2(0.6 * k.chub, 0.52)), sdEll(q, float2(0.0, 0.95), float2(0.43 * k.chub, 0.42)));
+        body -= 0.03 * k.fluff * fur(q, float2(0.0, 0.75), 20.0);
+        float haunch = min(sdEll(q, float2(-0.46, 0.25), float2(0.27, 0.25)), sdEll(q, float2(0.46, 0.25), float2(0.27, 0.25)));
+        float2 t0 = float2(0.4, 0.12), t1 = float2(0.86, 0.14), t2 = float2(1.02, 0.46 + 0.08 * sway);
+        float tail = min(segDist(q, t0, t1), segDist(q, t1, t2)) - 0.14 - 0.03 * k.fluff * fur(q, t1, 12.0) - 0.05 * ex.y;
+        float legs, paws;
+        if (pet) {
+            // Holding a heart up to its chest.
+            legs = min(segDist(q, float2(-0.32, 1.0), float2(-0.19, 0.86)), segDist(q, float2(0.32, 1.0), float2(0.19, 0.86))) - 0.11;
+            paws = min(length(q - float2(-0.17, 0.84)), length(q - float2(0.17, 0.84))) - 0.095;
+        } else if (groom) {
+            // One paw up at its mouth.
+            legs = segDist(q, float2(-0.17, 0.78), float2(-0.17, 0.1)) - 0.115;
+            paws = sdEll(q, float2(-0.18, 0.07), float2(0.14, 0.08));
+        } else {
+            legs = min(segDist(q, float2(-0.17, 0.78), float2(-0.17, 0.1)), segDist(q, float2(0.17, 0.78), float2(0.17, 0.1))) - 0.115;
+            paws = min(sdEll(q, float2(-0.18, 0.07), float2(0.14, 0.08)), sdEll(q, float2(0.18, 0.07), float2(0.14, 0.08)));
+        }
+        float backPaws = min(sdEll(q, float2(-0.5, 0.05), float2(0.15, 0.07)), sdEll(q, float2(0.5, 0.05), float2(0.15, 0.07)));
+        float D = min(min(min(body, haunch), min(tail, legs)), min(paws, backPaws));
+        o = over(o, catLine, fillA(D - 0.025, px) * 0.9);
+        o = over(o, mix(k.main, k.dark, smoothstep(0.7, 1.05, q.x)), fillA(tail, px));
+        o = over(o, k.dark, fillA(tail, px) * k.stripes * smoothstep(0.5, 0.85, sin(length(q - t0) * 16.0)) * 0.8);
+        o = over(o, k.main * 0.95, fillA(haunch, px));
+        o = over(o, k.white, fillA(backPaws, px));
+        o = over(o, k.main, fillA(body, px));
+        if (k.stripes > 0.5) {
+            float band = smoothstep(0.5, 0.85, sin(q.y * 12.0)) * smoothstep(0.22, 0.45, abs(q.x));
+            o = over(o, k.dark, fillA(body, px) * band * 0.75);
+        }
+        // White bib down the chest and belly.
+        o = over(o, k.white, fillA(max(sdEll(q, float2(0.0, 0.72), float2(0.31, 0.6)), body), px * 3.0));
+        if (pet) {
+            float2 hp = (q - float2(0.0, 0.52)) / 0.42;
+            float hd = sdHeart(float2(hp.x, hp.y)) * 0.42;
+            o = over(o, float3(0.55, 0.08, 0.16), fillA(hd - 0.02, px));
+            o = over(o, float3(0.97, 0.35, 0.42), fillA(hd, px));
+            o = over(o, float3(1.0, 0.75, 0.78), fillA(length(q - float2(-0.1, 0.8)) - 0.045, px * 2.0) * 0.8);
+        }
+        o = over(o, catLine, fillA(legs - 0.022, px) * 0.6);
+        o = over(o, k.main, fillA(legs, px));
+        o = over(o, k.white, fillA(paws, px));
+        o = over(o, catLine, fillA(abs(paws) - 0.008, px) * 0.4);
+        o = catHeadFull(o, q, hc, s, ex.x, ex.y, pet || groom || lick || enjoy, groom || lick, px, k,
+                        lick ? 1.0 : (groom || enjoy ? 0.0 : turn));
+        if (groom) {
+            // The paw at its mouth: licked, then drawn up over the cheek.
+            float wv = sin(time * 6.0);
+            float2 up = float2(0.24 + 0.05 * wv, 1.2 + 0.12 * max(0.0, wv));
+            float arm = segDist(q, float2(0.3, 0.95), up) - 0.12;
+            float paw = length(q - up) - 0.15;
+            o = over(o, catLine, fillA(min(arm, paw) - 0.022, px) * 0.9);
+            o = over(o, k.main, fillA(arm, px));
+            o = over(o, k.white, fillA(paw, px));
+            float pad = sdEll(q, up + float2(0.0, -0.035), float2(0.065, 0.05));
+            float toes = min(min(length(q - (up + float2(-0.065, 0.055))), length(q - (up + float2(0.0, 0.08)))),
+                             length(q - (up + float2(0.065, 0.055)))) - 0.03;
+            o = over(o, float3(0.95, 0.6, 0.66), fillA(min(pad, toes), px));
+        }
+    } else {
+        float2 bc = float2(0.0, 0.66), br = float2(0.74, 0.36);
+        float2 hc = float2(0.74, 1.12);
+        float s = 0.95;
+        if (sleep) { bc = float2(0.0, 0.36); br = float2(0.84, 0.36); hc = float2(0.66, 0.52); }
+        if (air)   { bc = float2(0.0, 0.85); br = float2(0.88, 0.32) * (1.0 + 0.12 * ex.y); hc = float2(0.86, 1.18); }
+        if (play)  { bc = float2(-0.05, 0.56); br = float2(0.78, 0.32); hc = float2(0.78, 0.82); }
+        if (dig)   { bc = float2(-0.05, 0.56); br = float2(0.78, 0.32); hc = float2(0.8, 0.68); }
+        if (groomBack) { bc = float2(0.0, 0.4); br = float2(0.84, 0.38); hc = float2(-0.22, 0.88 + 0.04 * sin(time * 7.0)); }
+        if (flop)  { bc = float2(0.0, 0.34); br = float2(0.84, 0.32); hc = float2(0.86, 0.46); }
+
+        br.y *= k.chub;
+        float body = sdEll(q, bc, br);
+        if (play || dig) body = min(body, sdEll(q, float2(-0.52, 0.76), float2(0.36, 0.34)));
+        body -= 0.03 * k.fluff * fur(q, bc, 22.0);
+
+        float legsNear = 1e3, legsFar = 1e3;
+        if (!sleep && !flop && !groomBack) {
+            float hipY = bc.y - br.y * 0.35;
+            for (int i = 0; i < 4; i++) {
+                float hx = (i == 0) ? -0.48 : (i == 1) ? -0.3 : (i == 2) ? 0.36 : 0.54;
+                float off = (i == 0 || i == 3) ? 0.0 : 3.14159;
+                float2 hip = float2(hx, hipY);
+                float sw = sin(phase + off) * ex.z;
+                float2 foot = float2(hx + sw * 0.22, 0.06 + max(0.0, cos(phase + off)) * 0.1 * ex.z);
+                if (air) foot = hip + (i < 2 ? float2(-0.4, -0.28) : float2(0.4, -0.28));
+                if (play) {
+                    hip.y = (i < 2) ? 0.66 : 0.45;
+                    if (i == 2) foot = float2(0.62 + 0.32 * max(0.0, sin(phase)), 0.06 + 0.38 * max(0.0, sin(phase)));
+                    else if (i == 3) foot = float2(0.7, 0.05);
+                    else foot = float2(hx, 0.05);
+                }
+                if (dig) {
+                    hip.y = (i < 2) ? 0.66 : 0.42;
+                    float ph = phase + (i == 2 ? 0.0 : 3.14159);
+                    if (i >= 2) foot = float2(0.68 + 0.16 * sin(ph), 0.05 + 0.2 * max(0.0, sin(ph)));
+                    else foot = float2(hx, 0.05);
+                }
+                float dl = segDist(q, hip, foot) - 0.1;
+                if (i == 0 || i == 2) legsNear = min(legsNear, dl); else legsFar = min(legsFar, dl);
+            }
+        }
+        if (flop) {
+            for (int i = 0; i < 4; i++) {
+                float hx = (i == 0) ? -0.5 : (i == 1) ? -0.3 : (i == 2) ? 0.35 : 0.55;
+                float wob = sin(time * 3.0 + float(i)) * 0.04;
+                float2 foot = float2(hx + 0.18 * (i < 2 ? -1.0 : 1.0) + wob, 0.92 + 0.08 * float(i % 2));
+                float dl = segDist(q, float2(hx, 0.5), foot) - 0.1;
+                if (i == 0 || i == 2) legsNear = min(legsNear, dl); else legsFar = min(legsFar, dl);
+            }
+        }
+
+        float2 t0, t1, t2;
+        if (sleep || groomBack) { t0 = float2(-0.78, 0.25); t1 = float2(-0.55, 0.06); t2 = float2(0.3, 0.08); }
+        else if (flop) { t0 = float2(-0.78, 0.3); t1 = float2(-1.08, 0.16); t2 = float2(-1.32, 0.12 + 0.05 * sway); }
+        else {
+            t0 = bc + float2(-br.x * 0.9, br.y * 0.3);
+            t1 = t0 + float2(-0.32, 0.32 + 0.08 * sway);
+            t2 = t1 + float2(-0.06 + 0.15 * sway, 0.34);
+            if (air) { t1 = t0 + float2(-0.4, 0.15); t2 = t1 + float2(-0.3, 0.1 + 0.3 * ex.y); }
+            if (play || dig) { t1 = t0 + float2(-0.3, 0.4 + 0.1 * sin(time * 9.0)); t2 = t1 + float2(-0.1 + 0.2 * sin(time * 9.0), 0.3); }
+        }
+        float tail = min(segDist(q, t0, t1), segDist(q, t1, t2)) - 0.13 - 0.03 * k.fluff * fur(q, t1, 12.0) - 0.06 * ex.y;
+
+        float head = catHead(q, hc, s, k);
+        float D = min(min(body, min(head, catEars(q, hc, s))), min(min(legsNear, legsFar), tail));
+        o = over(o, catLine, fillA(D - 0.025, px) * 0.9);
+        float3 legFar = k.main * 0.82;
+        o = over(o, legFar, fillA(legsFar, px));
+        o = over(o, k.white * 0.86, fillA(max(legsFar, q.y - 0.24), px));
+        o = over(o, mix(k.main, k.dark, smoothstep(0.0, 0.3, length(q - t2))), fillA(tail, px));
+        o = over(o, k.dark, fillA(tail, px) * k.stripes * smoothstep(0.5, 0.85, sin(length(q - t0) * 16.0)) * 0.8);
+        float shade = 0.9 + 0.1 * smoothstep(bc.y - br.y, bc.y + br.y, q.y);
+        o = over(o, k.main * shade, fillA(body, px));
+        if (k.stripes > 0.5) {
+            float band = smoothstep(0.5, 0.85, sin(q.x * 11.0 + sin(q.y * 6.0) * 0.6));
+            o = over(o, k.dark, fillA(body, px) * band * smoothstep(bc.y - 0.05, bc.y + br.y * 0.5, q.y) * 0.8);
+        }
+        // White underside and chest.
+        float belly = smoothstep(bc.y - 0.02, bc.y - 0.2, q.y);
+        float chest = smoothstep(bc.x + br.x * 0.35, bc.x + br.x * 0.8, q.x);
+        o = over(o, k.white, fillA(body, px) * clamp(max(belly, chest), 0.0, 1.0));
+        o = over(o, catLine, fillA(legsNear - 0.022, px) * 0.6);
+        o = over(o, k.main, fillA(legsNear, px));
+        o = over(o, k.white, fillA(max(legsNear, q.y - 0.24), px));
+        if (ex2.y > 0.01) {
+            float2 cell = floor(q * 3.6);
+            float2 f = fract(q * 3.6) - 0.5 - (float2(hash21(cell + 1.3), hash21(cell + 5.9)) - 0.5) * 0.3;
+            float n = hash21(cell + 3.1);
+            float blob = length(f * float2(1.0, 1.4)) - (0.36 + 0.16 * hash21(cell + 9.7));
+            float onTop = smoothstep(bc.y - 0.05, bc.y + br.y * 0.6, q.y);
+            float stuck = step(n, ex2.y * 0.95) * onTop * fillA(body, px);
+            o = over(o, float3(0.97, 0.98, 1.0), fillA(blob, px * 3.6) * stuck);
+        }
+        bool happy = sleep || flop || groomBack;
+        o = catHeadFull(o, q, hc, s, ex.x, ex.y, happy, flop || groomBack, px, k, groomBack ? 0.0 : turn);
+        if (ex2.y > 0.01) {
+            float2 cell = floor(q * 4.0);
+            float2 f = fract(q * 4.0) - 0.5;
+            float stuck = step(hash21(cell + 2.2), ex2.y * 0.8) * step(hc.y + 0.1, q.y) * fillA(head, px);
+            o = over(o, float3(0.97, 0.98, 1.0), fillA(length(f) - 0.38, px * 4.0) * stuck);
+        }
     }
-    o = over(o, float3(0.95, 0.45, 0.5), fillA(length(q - (hc + float2(0.31, -0.06))) - 0.04, px));
-    if (flop) {
-        // Tongue out.
-        o = over(o, float3(0.2, 0.08, 0.08), fillA(sdEll(q, hc + float2(0.22, -0.22), float2(0.06, 0.075)) - 0.03, px));
-        o = over(o, float3(0.98, 0.5, 0.58), fillA(sdEll(q, hc + float2(0.22, -0.22), float2(0.06, 0.075)), px));
-    }
-    float wh = min(segDist(q, mz + float2(0.1, 0.0), mz + float2(0.46, 0.05)),
-                   segDist(q, mz + float2(0.1, -0.03), mz + float2(0.44, -0.11)));
-    o = over(o, float3(0.35, 0.25, 0.2), fillA(wh - 0.012, px) * 0.8);
     return o;
 }
 
@@ -270,6 +444,14 @@ float4 drawMug(float2 p, float px, float steam, float time, float seed) {
     return o;
 }
 
+// A sleepy "z".
+float4 drawZ(float2 uv, float px) {
+    float2 a = float2(-0.55, 0.55), b = float2(0.55, 0.55), c = float2(-0.55, -0.55), d = float2(0.55, -0.55);
+    float z = min(min(segDist(uv, a, b), segDist(uv, b, c)), segDist(uv, c, d));
+    float4 o = over(float4(0), float3(0.25, 0.32, 0.5), fillA(z - 0.26, px));
+    return over(o, float3(0.95, 0.97, 1.0), fillA(z - 0.13, px));
+}
+
 float4 drawHeart(float2 uv, float px) {
     float2 q = uv * 0.62 + float2(0.0, 0.4);
     float d = sdHeart(q) / 0.62;
@@ -285,7 +467,8 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
         float4 c;
         if (in.kind < 5.5) c = drawCat(uv, px, in.seed, in.facing, in.ex, in.ex2, u.time);
         else if (in.kind < 6.5) c = drawMug(uv, px, in.ex.x, u.time, in.seed);
-        else c = drawHeart(uv, px);
+        else if (in.kind < 7.5) c = drawHeart(uv, px);
+        else c = drawZ(uv, px);
         return c * in.alpha;
     }
     if (in.kind < 0.5) {
@@ -570,13 +753,13 @@ final class Renderer: NSObject, MTKViewDelegate {
             sprites.append(SpriteInstance(px: c.x, py: c.y, r: Mug.size, alpha: 1, kind: 6, seed: m.offset, ext: 2.4,
                                           pad: 1, a: max(0, 1 - m.age / 150)))
         }
-        if let cat = sim.cat, cat.state != .away {
+        for cat in sim.cats where cat.state != .away {
             let c = cat.p + SIMD2(0, cat.size)
             sprites.append(SpriteInstance(px: c.x, py: c.y, r: cat.size, alpha: 1, kind: 5, seed: cat.phase, ext: 1.8,
                                           pad: cat.facing, a: cat.blink, b: cat.startle,
                                           c: cat.state == .walking ? 1 : 0, d: cat.pose,
                                           e: cat.state == .shaking ? min(1, cat.shake * 2) : 0, f: cat.snowy,
-                                          g: cat.angle))
+                                          g: cat.angle, h: Float(cat.coat) + min(cat.look, 0.999) * 0.5))
             if cat.carrying {
                 let m = cat.p + SIMD2(cat.facing * cat.size * 1.12, cat.size * 0.62)
                 sprites.append(SpriteInstance(px: m.x, py: m.y, r: Mug.size * 0.8, alpha: 1, kind: 6, seed: 0, ext: 2.4,
@@ -584,7 +767,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         for h in sim.hearts {
-            sprites.append(SpriteInstance(px: h.p.x, py: h.p.y, r: 5 * (sim.cat?.size ?? 18) / 18, alpha: min(1, h.life * 2), kind: 7, seed: 0,
+            let grow: Float = h.isZ ? 0.7 + (1 - h.life) * 0.6 : 1
+            sprites.append(SpriteInstance(px: h.p.x, py: h.p.y, r: 5 * (sim.cat?.size ?? 18) / 18 * grow, alpha: min(1, h.life * 2),
+                                          kind: h.isZ ? 8 : 7, seed: 0,
                                           ext: 1.3, pad: 1))
         }
     }

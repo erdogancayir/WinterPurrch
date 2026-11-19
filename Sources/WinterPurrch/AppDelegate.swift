@@ -51,6 +51,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Opened again while already running (from Spotlight, Launchpad or Finder): show the menu, since there is no window.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        statusItem.button?.performClick(nil)
+        return false
+    }
+
     // MARK: - Screens
 
     private func rebuildScreens() {
@@ -134,7 +140,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(toggle(L("Melt Snow"), prefs.melt) { $0.melt.toggle() })
         menu.addItem(toggle(L("Cat"), prefs.cat) { $0.cat.toggle() })
         if prefs.cat {
-            menu.addItem(sliderItem(L("Cat Size"), value: prefs.catSize, range: 16...64) { [weak self] v in
+            menu.addItem(toggle(L("Friend"), prefs.friend) { $0.friend.toggle() })
+            menu.addItem(sliderItem(L("Cat Size"), value: prefs.catSize, range: 16...80) { [weak self] v in
                 self?.prefs.catSize = v
                 self?.applySettings()
             })

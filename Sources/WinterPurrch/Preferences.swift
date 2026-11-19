@@ -8,7 +8,7 @@ final class Preferences {
         d.register(defaults: [
             "intensity": 0.5, "opacity": 1.0,
             "ground": true, "dock": true, "windows": true,
-            "melt": true, "cat": true, "catSize": 32.0, "blizzard": false, "screenshots": false,
+            "melt": true, "cat": true, "friend": true, "catSize": 42.0, "blizzard": false, "screenshots": false,
             "dockTopOffset": -1.0, "dockWidthAdjust": 0.0,
         ])
     }
@@ -21,6 +21,7 @@ final class Preferences {
     var melt: Bool { get { d.bool(forKey: "melt") } set { d.set(newValue, forKey: "melt") } }
     var blizzard: Bool { get { d.bool(forKey: "blizzard") } set { d.set(newValue, forKey: "blizzard") } }
     var catSize: Float { get { d.float(forKey: "catSize") } set { d.set(newValue, forKey: "catSize") } }
+    var friend: Bool { get { d.bool(forKey: "friend") } set { d.set(newValue, forKey: "friend") } }
     var cat: Bool { get { d.bool(forKey: "cat") } set { d.set(newValue, forKey: "cat") } }
     var screenshots: Bool { get { d.bool(forKey: "screenshots") } set { d.set(newValue, forKey: "screenshots") } }
     /// Fine-tuning for the Dock's top edge and width, in points (`defaults write com.erdogancayir.WinterPurrch dockTopOffset -6`).
@@ -29,6 +30,6 @@ final class Preferences {
 
     var settings: Settings {
         Settings(intensity: intensity, opacity: opacity, ground: ground, dock: dock, windows: windows,
-                 melt: melt, blizzard: blizzard, cat: cat, catSize: catSize)
+                 melt: melt, blizzard: blizzard, cat: cat, friend: friend, catSize: catSize)
     }
 }

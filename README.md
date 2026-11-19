@@ -16,14 +16,17 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 - **Snowmen:** stack the balls. With two, the snowman gets a face, buttons and twig arms; with three, a top hat as well.
 - **A cat:** an orange tabby lives in the snow. It wanders the drifts leaving paw prints, climbs onto windows, naps, and now and then goes to play in the snow on the Dock, batting it into the air and pouncing on it.
 - **Coffee delivery:** every minute or two the cat trots off screen and comes back from either side with a steaming mug, which it leaves somewhere new each time: along the ground, or up on the Dock. Up to five pile up; click one to drink it.
+- **Grooming:** they lick a paw and wash their face with it, or turn round to lick their back, especially after shaking off a snowball.
 - **Clumsy:** now and then it trips and flops over with its legs in the air and its tongue out, or misjudges the edge of a window and tumbles off. It gets up and shakes the snow off as if nothing happened.
 - **Digging:** it paws at deep drifts, throwing the snow back between its legs until it has dug a hole.
-- **Startle and pet:** click the cat and it hops up with its fur on end, then dashes off. Hit it with a snowball and it shakes the snow out of its fur. Rest the cursor on it and it sits down and purrs, with hearts.
-- **Adjustable size:** a Cat Size slider in the menu.
+- **Startle and pet:** click the cat and it hops up with its fur on end, then dashes off. Hit it with a snowball and it shakes the snow out of its fur. Rest the cursor on it and it sits down and purrs, with hearts; stroke it back and forth for a few seconds and it drifts off to sleep.
+- **A friend:** a chubby ginger tabby with short fur and amber eyes keeps it company. The two go looking for each other, and when they meet they touch noses, wash each other's heads, curl up together for a nap, play-fight, or play tag. Sometimes one just tags along behind the other.
+- **Their own business:** they mostly look where they're going and only now and then glance up at you.
+- **Adjustable size:** a Cat Size slider in the menu, and a Friend toggle.
 - **Blizzard mode:** heavier snow and gusting wind.
 - **Light on resources:** about 7% of one core and around 50 MB of memory.
 
-<p align="center"><img src="docs/cat.png" width="340" alt="The cat sitting in the snow next to a mug of coffee, purring hearts"></p>
+<p align="center"><img src="docs/cat.png" width="760" alt="The grey longhair and the ginger tabby in every pose: walking, sitting, holding a heart, grooming, napping, leaping, playing, digging, flopped over and shaking off snow"></p>
 
 ## Menu
 
@@ -32,7 +35,7 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 | Intensity / Opacity | How much snow falls and how see-through it is |
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |
-| Cat | Show or hide the cat |
+| Cat / Friend / Cat Size | Show or hide the cat and its friend, and set their size |
 | Melt | Drifts slowly thaw so they don't take over the screen |
 | Clear Snow | Removes all settled snow and snowballs |
 | Pause | Stops the snow |
