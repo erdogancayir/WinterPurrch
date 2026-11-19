@@ -120,6 +120,90 @@ enum SelfTest {
         shot("settled")
         report(sim, "end", since: start)
 
+        // The cat: drops in, wanders, plays on the Dock, jumps when poked, fetches coffee, purrs when petted.
+        sim.hostsCat = true
+        sim.applySettings(s)
+        func catLine(_ label: String) {
+            guard let c = sim.cat else { return print("selftest: \(label): no cat") }
+            print("selftest: cat \(label): state=\(c.state) at \(Int(c.p.x)),\(Int(c.p.y)) ledge=\(c.ledge ?? 0) "
+                  + "carrying=\(c.carrying) mugs=\(sim.mugs.count) hearts=\(sim.hearts.count)")
+        }
+        run(6)
+        catLine("after 6s")
+        shot("cat-wander")
+        sim.playOnDockNow()
+        run(1.3)
+        catLine("playing")
+        shot("cat-play")
+        if let c = sim.cat {
+            let ground = c.p.y
+            sim.beginGrab(at: c.center)
+            sim.endGrab()
+            var highest: Float = 0
+            for k in 0..<90 {
+                run(1.0 / 60)
+                highest = max(highest, (sim.cat?.p.y ?? ground) - ground)
+                if k == 12 { shot("cat-jump") }
+                // Clicking again in mid-air must not throw it higher.
+                if k == 6, let c = sim.cat { sim.beginGrab(at: c.center); sim.endGrab() }
+            }
+            print("selftest: poke hop height \(Int(highest))pt for a \(Int(c.size))pt cat")
+        }
+        catLine("poked")
+        run(3)
+        // A snowball hit: it shakes the snow off where it stands.
+        if let c = sim.cat {
+            _ = sim.hitCreature(at: c.center, radius: 12, velocity: SIMD2(500, 0))
+            run(0.05)
+            catLine("hit by snowball")
+            shot("cat-snowy")
+            run(0.3)
+            shot("cat-shaking")
+            run(1.2)
+            catLine("after shaking")
+        }
+        run(4)
+        // Clumsy moments: tripping flat, digging, tumbling off a ledge.
+        sim.catDo("flop")
+        run(0.4)
+        catLine("flopped")
+        shot("cat-flop")
+        run(4)
+        sim.playOnDockNow()
+        sim.catDo("dig")
+        run(0.8)
+        catLine("digging")
+        shot("cat-dig")
+        sim.playOnDockNow()
+        sim.catDo("tumble")
+        run(0.16)
+        catLine("tumbling")
+        shot("cat-tumble")
+        run(0.6)
+        catLine("after tumble")
+        run(4)
+
+        // Several coffee runs: mugs should end up in different places.
+        for run_ in 0..<4 {
+            let before = sim.mugs.count
+            sim.fetchCoffeeNow()
+            var waited: Float = 0
+            while sim.mugs.count == before && waited < 60 {
+                run(0.5)
+                waited += 0.5
+            }
+            catLine("coffee \(run_ + 1) after \(waited)s")
+            run(2)
+        }
+        print("selftest: mugs at " + sim.mugs.map { "\(Int($0.p.x)),\(Int($0.p.y)) on \($0.ledge ?? 0)" }.joined(separator: "; "))
+        shot("cat-coffee")
+        if let c = sim.cat {
+            let spot = c.center
+            run(2.5) { _ in spot }
+        }
+        catLine("petted")
+        shot("cat-pet")
+
         // A window dragged quickly throws its snow off.
         let moved = [WindowInfo(id: 1, rect: windowA.offsetBy(dx: 60, dy: 0)), WindowInfo(id: 2, rect: windowB)]
         sim.updateWindows(moved, dt: 1.0 / 30, keepVanished: false)

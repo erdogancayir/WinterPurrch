@@ -14,8 +14,16 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 - **Sweep it:** move the cursor through a drift and the powder sprays aside.
 - **Snowballs:** hold **⌥ Option**, press on the snow and drag. The ball grows as it rolls through the snow. Let go while moving to throw it, and it bursts where it lands. Let go gently and it drops and stays put.
 - **Snowmen:** stack the balls. With two, the snowman gets a face, buttons and twig arms; with three, a top hat as well.
+- **A cat:** an orange tabby lives in the snow. It wanders the drifts leaving paw prints, climbs onto windows, naps, and now and then goes to play in the snow on the Dock, batting it into the air and pouncing on it.
+- **Coffee delivery:** every minute or two the cat trots off screen and comes back from either side with a steaming mug, which it leaves somewhere new each time: along the ground, or up on the Dock. Up to five pile up; click one to drink it.
+- **Clumsy:** now and then it trips and flops over with its legs in the air and its tongue out, or misjudges the edge of a window and tumbles off. It gets up and shakes the snow off as if nothing happened.
+- **Digging:** it paws at deep drifts, throwing the snow back between its legs until it has dug a hole.
+- **Startle and pet:** click the cat and it hops up with its fur on end, then dashes off. Hit it with a snowball and it shakes the snow out of its fur. Rest the cursor on it and it sits down and purrs, with hearts.
+- **Adjustable size:** a Cat Size slider in the menu.
 - **Blizzard mode:** heavier snow and gusting wind.
 - **Light on resources:** about 7% of one core and around 50 MB of memory.
+
+<p align="center"><img src="docs/cat.png" width="340" alt="The cat sitting in the snow next to a mug of coffee, purring hearts"></p>
 
 ## Menu
 
@@ -24,6 +32,7 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 | Intensity / Opacity | How much snow falls and how see-through it is |
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |
+| Cat | Show or hide the cat |
 | Melt | Drifts slowly thaw so they don't take over the screen |
 | Clear Snow | Removes all settled snow and snowballs |
 | Pause | Stops the snow |
@@ -49,7 +58,7 @@ The simulation can run a scripted scene without a screen and save pictures of it
 .build/release/WinterPurrch --selftest /tmp/winterpurrch
 ```
 
-It snows on two windows and a Dock, sweeps a drift with the cursor, builds a snowman, throws a snowball and shakes a window, then prints how deep the snow got and how long a simulation step takes.
+It snows on two windows and a Dock, sweeps a drift with the cursor, builds a snowman, throws a snowball, lets the cat play, jump and fetch coffee, and shakes a window, then prints how deep the snow got and how long a simulation step takes.
 
 ### Debug options
 
@@ -66,7 +75,8 @@ tail -f ~/Library/Logs/WinterPurrch.log
 | File | Role |
 | --- | --- |
 | `Simulation.swift` | Snow physics: flakes, heightmap drifts, snowballs, snowmen |
-| `Renderer.swift` | Metal shaders for flakes, drifts and snowballs (compiled at runtime) |
+| `Cat.swift` | The cat's behaviour, the mugs it brings and the hearts it purrs |
+| `Renderer.swift` | Metal shaders for flakes, drifts, snowballs and the cat, drawn from shapes (compiled at runtime) |
 | `Overlay.swift` | One transparent panel per screen; takes the mouse only while you make a snowball |
 | `Surfaces.swift` | Reads window positions and the Dock's exact frame |
 | `AppDelegate.swift` | Menu bar, settings, window tracking |
@@ -76,6 +86,5 @@ Each surface that collects snow (the ground, the Dock, every window top) is a he
 
 ## Roadmap
 
-- A cat that wanders through the drifts, leaves paw prints and brings you coffee
 - More seasons: autumn leaves, rain, cherry blossom
 - Snowmen that survive a restart

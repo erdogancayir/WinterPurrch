@@ -14,6 +14,8 @@ struct Settings {
     var windows = true
     var melt = false
     var blizzard = false
+    var cat = true
+    var catSize: Float = 32
 }
 
 /// A falling or flying bit of snow.
@@ -106,6 +108,11 @@ final class SnowSimulation {
     private(set) var flakes: [Flake] = []
     private(set) var ledges: [Int: Ledge] = [:]
     private(set) var balls: [Snowball] = []
+    /// The cat lives on one screen only; this one hosts it when `hostsCat` is set.
+    var hostsCat = false
+    var cat: Cat?
+    var mugs: [Mug] = []
+    var hearts: [Heart] = []
     private var stash: [Int: [Float]] = [:]
     private var pending: [Flake] = []
 
@@ -116,8 +123,8 @@ final class SnowSimulation {
     private var spawnDebt: Float = 0
     private var prefilled = false
 
-    private var cursor: SIMD2<Float>?
-    private var cursorVelocity = SIMD2<Float>(repeating: 0)
+    private(set) var cursor: SIMD2<Float>?
+    private(set) var cursorVelocity = SIMD2<Float>(repeating: 0)
     private var heldBall: Int?
     private var nextUID = 1
 
@@ -148,6 +155,10 @@ final class SnowSimulation {
         let old = settings
         settings = s
         if old.ground != s.ground { rebuildGround() }
+        Mug.size = s.catSize * 0.42
+        if hostsCat && s.cat && cat == nil { spawnCat() }
+        cat?.size = s.catSize
+        if !s.cat { cat = nil }
         if old.windows && !s.windows {
             for (id, l) in ledges where l.kind == .window {
                 drop(l, fraction: 1, velocity: .zero)
@@ -267,6 +278,8 @@ final class SnowSimulation {
         }
         stash.removeAll()
         balls.removeAll()
+        mugs.removeAll()
+        hearts.removeAll()
         heldBall = nil
         flakes.removeAll { $0.kind != .flake }
     }
@@ -306,7 +319,7 @@ final class SnowSimulation {
                              amount: area, kind: .clump, seed: rand(0, 100)))
     }
 
-    private func addSpray(at p: SIMD2<Float>, velocity: SIMD2<Float>, amount: Float, r: Float = rand(1.1, 2.4)) {
+    func addSpray(at p: SIMD2<Float>, velocity: SIMD2<Float>, amount: Float, r: Float = rand(1.1, 2.4)) {
         pending.append(Flake(p: p, v: velocity, r: r, depth: 1, phase: rand(0, 6.28), speed: rand(30, 50),
                              amount: amount, kind: .spray, seed: rand(0, 100)))
     }
@@ -322,6 +335,7 @@ final class SnowSimulation {
         moveFlakes(dt, active)
         if let p = cursor, heldBall == nil { carve(around: p, active) }
         updateBalls(dt, active)
+        updateCat(dt, active)
         settle(dt, active)
         if !pending.isEmpty {
             flakes.append(contentsOf: pending)
@@ -430,7 +444,7 @@ final class SnowSimulation {
     }
 
     @inline(__always)
-    private func landing(x: Float, from y0: Float, to y1: Float, _ active: [Ledge]) -> (Ledge, Int)? {
+    func landing(x: Float, from y0: Float, to y1: Float, _ active: [Ledge]) -> (Ledge, Int)? {
         var best: (Ledge, Int)?
         var bestTop = -Float.infinity
         for l in active {
@@ -580,6 +594,7 @@ final class SnowSimulation {
     /// Whether the overlay should take the mouse: ⌥ is held over snow or a snowball, or a ball is in hand.
     func wantsMouse(optionHeld: Bool) -> Bool {
         if heldBall != nil { return true }
+        if let c = cursor, creatureUnder(c) { return true }
         guard optionHeld, let c = cursor else { return false }
         if balls.contains(where: { $0.state != .held && simd_distance($0.p, c) < $0.r + 6 }) { return true }
         return snowDepth(near: c) > 1
@@ -598,6 +613,7 @@ final class SnowSimulation {
 
     func beginGrab(at p: SIMD2<Float>) {
         cursor = p
+        if poke(at: p) { return }
         // Pick up a ball if one is under the cursor (the top one of a stack first).
         let hits = balls.indices.filter { balls[$0].state != .held && simd_distance(balls[$0].p, p) < balls[$0].r + 6 }
         if let i = hits.max(by: { balls[$0].p.y < balls[$1].p.y }) {
@@ -702,6 +718,11 @@ final class SnowSimulation {
         b.v.y -= 1500 * dt
         b.v.x *= 1 - 0.15 * dt
         b.p += b.v * dt
+        if hitCreature(at: b.p, radius: r, velocity: b.v) {
+            balls[i] = b
+            splats.append(b.uid)
+            return
+        }
         if b.p.x - r < 0 || b.p.x + r > size.x {
             if abs(b.v.x) > 350 {
                 balls[i] = b

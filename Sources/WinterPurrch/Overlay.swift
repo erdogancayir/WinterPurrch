@@ -91,6 +91,7 @@ final class ScreenSnow {
         let size = screen.frame.size
         let topLimit = Float(screen.visibleFrame.maxY - screen.frame.minY)
         simulation = SnowSimulation(size: SIMD2(Float(size.width), Float(size.height)), topLimit: topLimit)
+        simulation.hostsCat = screen == NSScreen.screens.first
         simulation.applySettings(settings)
         view = SnowView(frame: CGRect(origin: .zero, size: size), device: MTLCreateSystemDefaultDevice())
         view.simulation = simulation
@@ -147,7 +148,9 @@ final class ScreenSnow {
             Log.write("capture \(want ? "on" : "off")")
             capturing = want
             panel.ignoresMouseEvents = !want
-            if want && !simulation.isHolding { NSCursor.openHand.set() }
+            if want && !simulation.isHolding {
+                if let p = point, simulation.creatureUnder(p) { NSCursor.pointingHand.set() } else { NSCursor.openHand.set() }
+            }
             if !want { NSCursor.arrow.set() }
         }
     }

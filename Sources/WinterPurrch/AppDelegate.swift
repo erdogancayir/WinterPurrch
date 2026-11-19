@@ -132,6 +132,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(accumulate)
         menu.addItem(toggle(L("Blizzard"), prefs.blizzard) { $0.blizzard.toggle() })
         menu.addItem(toggle(L("Melt Snow"), prefs.melt) { $0.melt.toggle() })
+        menu.addItem(toggle(L("Cat"), prefs.cat) { $0.cat.toggle() })
+        if prefs.cat {
+            menu.addItem(sliderItem(L("Cat Size"), value: prefs.catSize, range: 16...64) { [weak self] v in
+                self?.prefs.catSize = v
+                self?.applySettings()
+            })
+        }
         menu.addItem(.separator())
 
         let hint = NSMenuItem(title: L("Snowball: hold ⌥, grab the snow and throw"), action: nil, keyEquivalent: "")
@@ -140,6 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let hint2 = NSMenuItem(title: L("Stack the balls to build a snowman ☃︎"), action: nil, keyEquivalent: "")
         hint2.isEnabled = false
         menu.addItem(hint2)
+        let hint3 = NSMenuItem(title: L("Cat: click to startle it, hover to pet it"), action: nil, keyEquivalent: "")
+        hint3.isEnabled = false
+        menu.addItem(hint3)
         menu.addItem(item(L("Clear Snow"), #selector(clearSnow)))
         menu.addItem(item(paused ? L("Resume") : L("Pause"), #selector(togglePause)))
         menu.addItem(.separator())
