@@ -212,12 +212,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         open.keyEquivalent = ","
         menu.addItem(open)
         menu.addItem(.separator())
-        menu.addItem(sliderItem(L("Intensity"), value: prefs.intensity, range: 0.05...1) { [weak self] v in
+        menu.addItem(sliderItem(L("Snow Amount"), value: prefs.intensity, range: 0.06...1) { [weak self] v in
             self?.prefs.intensity = v
             self?.applySettings()
         })
         menu.addItem(sliderItem(L("Fall Speed"), value: prefs.fallSpeed, range: 0.3...2.5) { [weak self] v in
             self?.prefs.fallSpeed = v
+            self?.applySettings()
+        })
+        menu.addItem(sliderItem(L("Flake Size"), value: prefs.flakeSize, range: 0.5...2.5) { [weak self] v in
+            self?.prefs.flakeSize = v
             self?.applySettings()
         })
         menu.addItem(sliderItem(L("Opacity"), value: prefs.opacity, range: 0.25...1) { [weak self] v in

@@ -46,6 +46,25 @@ enum SelfTest {
             print("selftest: fallSpeed=\(speed) fastest flake=\(Int(fastest))pt/s ground after 90s=\(String(format: "%.1f", g))")
         }
 
+        // Flake size and amount: a few pictures to compare.
+        for (name, amount, flakeSize) in [("flakes-small", Float(0.5), Float(0.5)), ("flakes-normal", 0.5, 1), ("flakes-big", 0.5, 2.5), ("flakes-sparse", 0.06, 1)] {
+            let look = SnowSimulation(size: SIMD2(600, 400), topLimit: 400)
+            var p = Settings()
+            p.intensity = amount
+            p.flakeSize = flakeSize
+            p.cat = false
+            look.applySettings(p)
+            for _ in 0..<60 { look.step(dt: 1.0 / 60, cursor: nil) }
+            let count = look.flakes.filter { $0.kind == .flake }.count
+            print("selftest: \(name) flakes on screen=\(count)")
+            guard let device = MTLCreateSystemDefaultDevice(),
+                  let renderer = Renderer(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1, simulation: look),
+                  let image = renderer.snapshot(width: 600, height: 400, background: MTLClearColor(red: 0.1, green: 0.14, blue: 0.24, alpha: 1))
+            else { return 1 }
+            try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: "\(outputDirectory)/\(name).png"))
+        }
+
         let sim = SnowSimulation(size: size, topLimit: 500)
         var s = Settings()
         s.intensity = 1

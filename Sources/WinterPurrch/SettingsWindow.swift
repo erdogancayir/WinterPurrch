@@ -16,6 +16,7 @@ final class SettingsModel: ObservableObject {
 
     @Published var intensity: Double { didSet { prefs.intensity = Float(intensity); apply() } }
     @Published var fallSpeed: Double { didSet { prefs.fallSpeed = Float(fallSpeed); apply() } }
+    @Published var flakeSize: Double { didSet { prefs.flakeSize = Float(flakeSize); apply() } }
     @Published var opacity: Double { didSet { prefs.opacity = Float(opacity); apply() } }
     @Published var blizzard: Bool { didSet { prefs.blizzard = blizzard; apply() } }
     @Published var melt: Bool { didSet { prefs.melt = melt; apply() } }
@@ -47,6 +48,7 @@ final class SettingsModel: ObservableObject {
     init() {
         intensity = Double(prefs.intensity)
         opacity = Double(prefs.opacity)
+        flakeSize = Double(prefs.flakeSize)
         fallSpeed = Double(prefs.fallSpeed)
         blizzard = prefs.blizzard
         melt = prefs.melt
@@ -72,6 +74,7 @@ final class SettingsModel: ObservableObject {
         setPaused = { _ in }
         intensity = fresh.intensity
         opacity = fresh.opacity
+        flakeSize = fresh.flakeSize
         fallSpeed = fresh.fallSpeed
         blizzard = fresh.blizzard
         melt = fresh.melt
@@ -97,8 +100,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section(L("Snow")) {
-                LabeledContent(L("Intensity")) { Slider(value: $model.intensity, in: 0.05...1) }
+                LabeledContent(L("Snow Amount")) { Slider(value: $model.intensity, in: 0.06...1) }
                 LabeledContent(L("Fall Speed")) { Slider(value: $model.fallSpeed, in: 0.3...2.5) }
+                LabeledContent(L("Flake Size")) { Slider(value: $model.flakeSize, in: 0.5...2.5) }
                 LabeledContent(L("Opacity")) { Slider(value: $model.opacity, in: 0.25...1) }
                 Toggle(L("Blizzard"), isOn: $model.blizzard)
                 Toggle(L("Melt Snow"), isOn: $model.melt)

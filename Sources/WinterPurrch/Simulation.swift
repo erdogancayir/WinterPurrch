@@ -9,6 +9,7 @@ let columnWidth: Float = 2
 struct Settings {
     var intensity: Float = 0.5      // 0...1
     var fallSpeed: Float = 1        // how fast flakes come down, 0.3...2.5
+    var flakeSize: Float = 1        // how big flakes look, 0.5...2.5
     var opacity: Float = 1
     var ground = true
     var dock = true

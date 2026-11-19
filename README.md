@@ -67,7 +67,8 @@ The window and the menu offer the same settings:
 
 | Item | What it does |
 | --- | --- |
-| Intensity / Opacity | How much snow falls and how see-through it is |
+| Snow Amount / Opacity | How much snow falls, from a few stray flakes to a heavy fall, and how see-through it is |
+| Flake Size | Fine powder or big fluffy flakes |
 | Fall Speed | From slow, drifting flakes to a quick downpour; the snow piles up just as fast either way |
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |

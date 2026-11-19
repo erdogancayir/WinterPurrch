@@ -922,9 +922,11 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
 
+        let flakeSize = sim.settings.flakeSize
         for f in sim.flakes {
             let a: Float = f.kind == .flake ? (0.35 + f.depth * 0.6) : 0.95
-            sprites.append(SpriteInstance(px: f.p.x, py: f.p.y, r: f.r, alpha: a, kind: 0, seed: f.seed, ext: 1, pad: 0))
+            let r = f.kind == .flake ? f.r * flakeSize : f.r
+            sprites.append(SpriteInstance(px: f.p.x, py: f.p.y, r: r, alpha: a, kind: 0, seed: f.seed, ext: 1, pad: 0))
         }
         for b in sim.balls {
             let kind: Float = b.body ? 4 : (b.hat ? 3 : (b.face ? 2 : 1))
