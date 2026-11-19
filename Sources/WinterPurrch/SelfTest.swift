@@ -29,6 +29,23 @@ enum SelfTest {
             }
         }
 
+        // Fall speed changes how fast the flakes come down, not how fast the snow piles up.
+        for speed: Float in [0.3, 1, 2.5] {
+            let paced = SnowSimulation(size: size, topLimit: 500)
+            var p = Settings()
+            p.fallSpeed = speed
+            paced.applySettings(p)
+            var fastest: Float = 0
+            for k in 0..<(60 * 90) {
+                paced.step(dt: 1.0 / 60, cursor: nil)
+                if k == 60 * 30 {
+                    fastest = paced.flakes.filter { $0.kind == .flake }.map { -$0.v.y }.max() ?? 0
+                }
+            }
+            let g = paced.ledges[SnowSimulation.groundID].map { $0.total / $0.width } ?? 0
+            print("selftest: fallSpeed=\(speed) fastest flake=\(Int(fastest))pt/s ground after 90s=\(String(format: "%.1f", g))")
+        }
+
         let sim = SnowSimulation(size: size, topLimit: 500)
         var s = Settings()
         s.intensity = 1

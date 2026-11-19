@@ -216,6 +216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.prefs.intensity = v
             self?.applySettings()
         })
+        menu.addItem(sliderItem(L("Fall Speed"), value: prefs.fallSpeed, range: 0.3...2.5) { [weak self] v in
+            self?.prefs.fallSpeed = v
+            self?.applySettings()
+        })
         menu.addItem(sliderItem(L("Opacity"), value: prefs.opacity, range: 0.25...1) { [weak self] v in
             self?.prefs.opacity = v
             self?.applySettings()

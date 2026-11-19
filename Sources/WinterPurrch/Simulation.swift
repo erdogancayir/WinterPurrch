@@ -8,6 +8,7 @@ let columnWidth: Float = 2
 
 struct Settings {
     var intensity: Float = 0.5      // 0...1
+    var fallSpeed: Float = 1        // how fast flakes come down, 0.3...2.5
     var opacity: Float = 1
     var ground = true
     var dock = true
@@ -458,7 +459,7 @@ final class SnowSimulation {
         }
         let falling = Float(flakes.lazy.filter { $0.kind == .flake }.count)
         guard falling < target * 1.1 else { return }
-        let fallTime = size.y / (settings.blizzard ? 95 : 48)
+        let fallTime = size.y / ((settings.blizzard ? 95 : 48) * settings.fallSpeed)
         spawnDebt += target / fallTime * dt
         while spawnDebt >= 1 {
             spawnDebt -= 1
@@ -473,7 +474,7 @@ final class SnowSimulation {
         let x = rand(-margin, size.x + margin) - wind * 4
         return Flake(p: SIMD2(x, y), v: SIMD2(0, -30), r: r, depth: depth, phase: rand(0, 6.28),
                      speed: (18 + depth * 52) * rand(0.8, 1.2) * (settings.blizzard ? 1.8 : 1),
-                     amount: 20 + r * 4, kind: .flake, seed: rand(0, 100))
+                     amount: (20 + r * 4) / max(settings.fallSpeed, 0.1), kind: .flake, seed: rand(0, 100))
     }
 
     private func moveFlakes(_ dt: Float, _ active: [Ledge]) {
@@ -486,7 +487,9 @@ final class SnowSimulation {
             switch f.kind {
             case .flake, .spray:
                 let sway = sin(time * (0.6 + f.seed.truncatingRemainder(dividingBy: 1)) + f.phase) * 16 * f.depth
-                let target = SIMD2(wind * (0.4 + f.depth * 0.6) + sway, -f.speed)
+                // Only falling flakes follow the speed setting; spray keeps its own.
+                let fall = f.kind == .flake ? f.speed * settings.fallSpeed : f.speed
+                let target = SIMD2(wind * (0.4 + f.depth * 0.6) + sway, -fall)
                 let k: Float = f.kind == .spray ? 2.6 : 1.4
                 f.v += (target - f.v) * min(1, k * dt)
             case .clump:

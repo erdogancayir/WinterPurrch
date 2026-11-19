@@ -63,6 +63,7 @@ The window and the menu offer the same settings:
 | Item | What it does |
 | --- | --- |
 | Intensity / Opacity | How much snow falls and how see-through it is |
+| Fall Speed | From slow, drifting flakes to a quick downpour; the snow piles up just as fast either way |
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |
 | Cat / Friend / Cat Size | Show or hide the cat and its friend, and set their size |
