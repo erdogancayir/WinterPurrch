@@ -654,6 +654,34 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
     }
     if (in.kind < 0.5) {
         float core = 1.0 - smoothstep(0.3, 1.0, d);
+        // Falling flakes big enough to see turn into six-armed crystals, slowly turning as they fall.
+        float w = in.ex.x * smoothstep(3.5, 7.0, in.r / max(u.scale, 1.0));
+        if (w > 0.0) {
+            float spin = (0.25 + fract(in.seed * 3.7) * 0.5) * (fract(in.seed * 9.1) > 0.5 ? 1.0 : -1.0);
+            float ang = in.seed * 6.0 + u.time * spin;
+            float2 q = float2(cos(ang) * uv.x - sin(ang) * uv.y, sin(ang) * uv.x + cos(ang) * uv.y);
+            const float sector = 1.0471976;
+            float th0 = atan2(q.y, q.x);
+            th0 = fmod(th0 + sector * 0.5 + 6.2831853 * 2.0, sector) - sector * 0.5;
+            float rr = length(q);
+            q = float2(cos(th0), abs(sin(th0))) * rr;
+            float px = 1.0 / max(in.r, 1.0);
+            // Arms, a pair of side branches on each (their shape varies from flake to flake), and a hexagonal heart.
+            float b1 = 0.32 + fract(in.seed * 5.3) * 0.12;
+            float b2 = 0.56 + fract(in.seed * 2.9) * 0.12;
+            float l1 = 0.2 + fract(in.seed * 7.7) * 0.1;
+            float l2 = 0.13 + fract(in.seed * 4.1) * 0.08;
+            float sd = segDist(q, float2(0.0), float2(0.88, 0.0));
+            sd = min(sd, segDist(q, float2(b1, 0.0), float2(b1 + l1 * 0.75, l1)));
+            sd = min(sd, segDist(q, float2(b2, 0.0), float2(b2 + l2 * 0.75, l2)));
+            float thick = max(0.055, px * 0.8);
+            float arms = 1.0 - smoothstep(thick - px, thick + px, sd);
+            float hexd = max(q.x * 0.866 + abs(q.y) * 0.5, q.x) - 0.15;
+            float heart = 1.0 - smoothstep(-px, px, hexd);
+            float crystal = max(arms, heart);
+            float glow = (1.0 - smoothstep(0.0, 0.9, rr)) * 0.18;
+            core = mix(core, max(crystal, glow), w);
+        }
         float a = core * in.alpha * u.opacity;
         float3 c = mix(float3(0.97, 0.985, 1.0), float3(0.8, 0.86, 1.0), u.pad0 * 0.5);
         return float4(c * a, a);
@@ -925,8 +953,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         let flakeSize = sim.settings.flakeSize
         for f in sim.flakes {
             let a: Float = f.kind == .flake ? (0.35 + f.depth * 0.6) : 0.95
-            let r = f.kind == .flake ? f.r * flakeSize : f.r
-            sprites.append(SpriteInstance(px: f.p.x, py: f.p.y, r: r, alpha: a, kind: 0, seed: f.seed, ext: 1, pad: 0))
+            let falling = f.kind == .flake
+            let r = falling ? f.r * flakeSize : f.r
+            sprites.append(SpriteInstance(px: f.p.x, py: f.p.y, r: r, alpha: a, kind: 0, seed: f.seed, ext: 1, pad: 0,
+                                          a: falling ? 1 : 0))
         }
         for b in sim.balls {
             let kind: Float = b.body ? 4 : (b.hat ? 3 : (b.face ? 2 : 1))
