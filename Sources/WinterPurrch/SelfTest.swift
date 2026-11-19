@@ -332,6 +332,58 @@ enum SelfTest {
         return 0
     }
 
+    /// `--icon <dir>`: renders the app icon at 1024 pt, in a few variations to choose from.
+    static func icon(outputDirectory: String) -> Int32 {
+        let inner = 824
+        for (variant, petted) in [("sit", false), ("heart", true)] {
+            let sim = SnowSimulation(size: SIMD2(Float(inner), Float(inner)), topLimit: Float(inner))
+            var s = Settings()
+            s.intensity = 0.55
+            s.cat = false
+            sim.applySettings(s)
+            sim.step(dt: 1.0 / 60, cursor: nil)     // falling flakes all over
+            if let g = sim.ledges[SnowSimulation.groundID] {
+                for i in g.h.indices {
+                    let x = (Float(i) / Float(g.h.count) - 0.5) * 2
+                    g.h[i] = 150 + 70 * cos(x * 1.4) - 40 * x * x
+                }
+            }
+            let ground = sim.ledges[SnowSimulation.groundID].map { $0.h[$0.h.count / 2] } ?? 150
+            var c = Cat(p: SIMD2(Float(inner) / 2, ground - 8))
+            c.size = 230
+            c.state = .sitting
+            c.look = 1
+            if petted { c.petting = 1 }
+            sim.cat = c
+            guard let device = MTLCreateSystemDefaultDevice(),
+                  let renderer = Renderer(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1, simulation: sim),
+                  let layer = renderer.snapshot(width: inner, height: inner, background: MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)),
+                  let ctx = CGContext(data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return 1 }
+            let rect = CGRect(x: 100, y: 100, width: inner, height: inner)
+            let shape = CGPath(roundedRect: rect, cornerWidth: 185, cornerHeight: 185, transform: nil)
+            ctx.saveGState()
+            ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: CGColor(gray: 0, alpha: 0.35))
+            ctx.addPath(shape)
+            ctx.setFillColor(CGColor(red: 0.2, green: 0.25, blue: 0.45, alpha: 1))
+            ctx.fillPath()
+            ctx.restoreGState()
+            ctx.saveGState()
+            ctx.addPath(shape)
+            ctx.clip()
+            let colors = [CGColor(red: 0.16, green: 0.2, blue: 0.42, alpha: 1), CGColor(red: 0.42, green: 0.36, blue: 0.68, alpha: 1)] as CFArray
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
+            ctx.drawLinearGradient(gradient, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+            ctx.draw(layer, in: rect)
+            ctx.restoreGState()
+            guard let image = ctx.makeImage() else { return 1 }
+            try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: "\(outputDirectory)/icon-\(variant).png"))
+        }
+        return 0
+    }
+
     private static func groundTop(_ sim: SnowSimulation, at x: Float) -> Float {
         guard let g = sim.ledges[SnowSimulation.groundID], let i = g.column(at: x) else { return 0 }
         return g.h[i]

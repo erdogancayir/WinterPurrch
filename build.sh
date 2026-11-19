@@ -11,6 +11,7 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin/WinterPurrch" "$app/Contents/MacOS/WinterPurrch"
 cp Resources/Info.plist "$app/Contents/"
+cp Resources/AppIcon.icns "$app/Contents/Resources/"
 for lproj in Resources/*.lproj; do
     mkdir -p "$app/Contents/Resources/$(basename "$lproj")"
     plutil -convert binary1 -o "$app/Contents/Resources/$(basename "$lproj")/Localizable.strings" "$lproj/Localizable.strings"

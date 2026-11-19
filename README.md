@@ -1,4 +1,6 @@
-# WinterPurrch
+<p align="center"><img src="docs/icon.png" width="128" height="128" alt="WinterPurrch icon: a grey-and-white cat holding a heart, sitting on a snowy hill"></p>
+
+<h1 align="center">WinterPurrch</h1>
 
 A cozy little world on your Mac desktop. Snow drifts down, piles up on your windows and the Dock, and you can scoop it into snowballs, throw them, or stack them into a snowman.
 

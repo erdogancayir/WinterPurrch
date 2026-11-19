@@ -13,6 +13,8 @@
 	<string>WinterPurrch</string>
 	<key>CFBundleExecutable</key>
 	<string>WinterPurrch</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.erdogancayir.WinterPurrch</string>
 	<key>CFBundleInfoDictionaryVersion</key>
