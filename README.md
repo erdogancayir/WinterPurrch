@@ -13,6 +13,10 @@ On a real desktop:
   <img src="docs/screenshot-coffee.png" width="420" alt="The ginger tabby next to a steaming mug of coffee it brought, beside the Dock's trash">
 </p>
 
+<p align="center">
+  <img src="docs/screenshot-snowman.png" width="420" alt="A big snowman with a top hat and stick arms, a tiny snowman and a mug of coffee beside the snowy Dock">
+</p>
+
 WinterPurrch runs in the background with a settings window and a menu bar icon. It draws with Metal in a transparent overlay that never gets in the way of your clicks.
 
 ## Features
