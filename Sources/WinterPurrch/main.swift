@@ -6,6 +6,9 @@ if let i = arguments.firstIndex(of: "--selftest") {
     exit(SelfTest.run(outputDirectory: dir))
 }
 
+if let i = arguments.firstIndex(of: "--settingsshot") {
+    exit(SettingsSnapshot.run(path: i + 1 < arguments.count ? arguments[i + 1] : "settings.png"))
+}
 if let i = arguments.firstIndex(of: "--catsheet") {
     exit(SelfTest.catSheet(outputDirectory: i + 1 < arguments.count ? arguments[i + 1] : "."))
 }

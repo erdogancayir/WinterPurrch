@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dockCheckedAt: CFTimeInterval = 0
     private var paused = false
     private var screensAsleep = false
+    private let settingsWindow = SettingsWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -24,6 +25,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
 
         rebuildScreens()
+        let model = settingsWindow.model
+        model.apply = { [weak self] in
+            self?.applySettings()
+            self?.refreshVisibility()
+        }
+        model.setPaused = { [weak self] value in
+            self?.paused = value
+            self?.refreshVisibility()
+        }
+        model.clearSnow = { [weak self] in self?.clearSnow() }
+        // The first time, show where everything is: the menu bar icon may well be hidden behind the notch.
+        if !UserDefaults.standard.bool(forKey: "welcomed") {
+            UserDefaults.standard.set(true, forKey: "welcomed")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showSettings() }
+        }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(pollTimer!, forMode: .common)
 
@@ -51,11 +67,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// Opened again while already running (from Spotlight, Launchpad or Finder): show the menu, since there is no window.
+    /// Opened again while already running (from Spotlight, Launchpad or Finder): show the settings.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        statusItem.button?.performClick(nil)
+        showSettings()
         return false
     }
+
+    @objc private func showSettings() { settingsWindow.show(paused: paused) }
 
     // MARK: - Screens
 
@@ -119,6 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let title = NSMenuItem(title: "WinterPurrch", action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
+        let open = item(L("Open Settings…"), #selector(showSettings))
+        open.keyEquivalent = ","
+        menu.addItem(open)
+        menu.addItem(.separator())
         menu.addItem(sliderItem(L("Intensity"), value: prefs.intensity, range: 0.05...1) { [weak self] v in
             self?.prefs.intensity = v
             self?.applySettings()
@@ -205,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return i
     }
 
-    @objc private func clearSnow() { screens.forEach { $0.simulation.clear() } }
+    @objc func clearSnow() { screens.forEach { $0.simulation.clear() } }
 
     @objc private func togglePause() {
         paused.toggle()

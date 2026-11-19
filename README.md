@@ -4,7 +4,14 @@ A cozy little world on your Mac desktop. Snow drifts down, piles up on your wind
 
 <p align="center"><img src="docs/preview.png" width="720" alt="Snow piled on windows and the Dock, with a snowman standing on the Dock"></p>
 
-WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay that never gets in the way of your clicks.
+On a real desktop:
+
+<p align="center">
+  <img src="docs/screenshot-cat.png" width="420" alt="The grey-and-white cat walking through the snow at the bottom of the screen">
+  <img src="docs/screenshot-coffee.png" width="420" alt="The ginger tabby next to a steaming mug of coffee it brought, beside the Dock's trash">
+</p>
+
+WinterPurrch runs in the background with a settings window and a menu bar icon. It draws with Metal in a transparent overlay that never gets in the way of your clicks.
 
 ## Features
 
@@ -28,7 +35,13 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 
 <p align="center"><img src="docs/cat.png" width="760" alt="The grey longhair and the ginger tabby in every pose: walking, sitting, holding a heart, grooming, napping, leaping, playing, digging, flopped over and shaking off snow"></p>
 
-## Menu
+## Settings
+
+Open WinterPurrch from Spotlight (⌘Space, then type "WinterPurrch") or Launchpad, even while it is already running, and its settings window appears. It also opens by itself the first time, and from **Open Settings…** (⌘,) in the ❄ menu bar menu. That matters on a MacBook with a crowded menu bar, where the icon can end up hidden behind the notch.
+
+Closing the window leaves the snow falling; **Quit WinterPurrch** at the bottom stops it, and **Pause** stops it for a while. Turn on **Open at Login** to have it start with your Mac.
+
+The window and the menu offer the same settings:
 
 | Item | What it does |
 | --- | --- |
@@ -39,7 +52,7 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 | Melt | Drifts slowly thaw so they don't take over the screen |
 | Clear Snow | Removes all settled snow and snowballs |
 | Pause | Stops the snow |
-| Settings | Show in screenshots, open at login |
+| Open at Login / Show in Screenshots | Start with your Mac; let screenshots and screen sharing include the snow |
 
 ## Requirements
 
@@ -83,6 +96,7 @@ tail -f ~/Library/Logs/WinterPurrch.log
 | `Overlay.swift` | One transparent panel per screen; takes the mouse only while you make a snowball |
 | `Surfaces.swift` | Reads window positions and the Dock's exact frame |
 | `AppDelegate.swift` | Menu bar, settings, window tracking |
+| `SettingsWindow.swift` | The settings window (SwiftUI) |
 | `SelfTest.swift` | The headless scene used for testing |
 
 Each surface that collects snow (the ground, the Dock, every window top) is a heightmap of 2-point columns. Landing flakes add to a column, and a relaxation pass keeps slopes under the angle of repose and lets snow spill off open ends as falling clumps.
