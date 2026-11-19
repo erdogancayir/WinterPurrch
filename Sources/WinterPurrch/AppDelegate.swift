@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var laserOn = false {
         didSet {
             screens.forEach { $0.simulation.laserOn = laserOn }
+        updateNight()
             settingsWindow.model.laserShown = laserOn
         }
     }
@@ -37,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let model = settingsWindow.model
         model.apply = { [weak self] in
             self?.applySettings()
+            self?.updateNight()
             self?.applyFrameRate()
             self?.refreshVisibility()
         }
@@ -59,6 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.saveScene() }
         checkPower()
+        updateNight()
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.updateNight() }
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkPower() }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(pollTimer!, forMode: .common)
@@ -130,6 +134,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func applyFrameRate() {
         let slow = ProcessInfo.processInfo.isLowPowerModeEnabled || (prefs.batterySaver && power.onBattery)
         screens.forEach { $0.setFrameRate(slow ? 30 : 60) }
+    }
+
+    /// Night from 8 in the evening to 6 in the morning, fading over an hour at each end.
+    private func updateNight() {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        let hour = Float(parts.hour ?? 12) + Float(parts.minute ?? 0) / 60
+        let evening = min(max(hour - 19.5, 0), 1)
+        let morning = min(max(6.5 - hour, 0), 1)
+        let night = prefs.nightMode ? max(evening, morning) : 0
+        screens.forEach { $0.simulation.night = night }
     }
 
     /// On battery, and whether the battery is running low (under a fifth, not charging).

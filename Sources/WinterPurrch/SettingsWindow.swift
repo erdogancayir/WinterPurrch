@@ -26,6 +26,7 @@ final class SettingsModel: ObservableObject {
     @Published var catSize: Double { didSet { prefs.catSize = Float(catSize); apply() } }
     @Published var screenshots: Bool { didSet { prefs.screenshots = screenshots; apply() } }
     @Published var skater: Bool { didSet { prefs.skater = skater; apply() } }
+    @Published var nightMode: Bool { didSet { prefs.nightMode = nightMode; apply() } }
     @Published var birds: Bool { didSet { prefs.birds = birds; apply() } }
     @Published var batterySaver: Bool { didSet { prefs.batterySaver = batterySaver; apply() } }
     @Published var paused = false { didSet { setPaused(paused) } }
@@ -57,6 +58,7 @@ final class SettingsModel: ObservableObject {
         skater = prefs.skater
         batterySaver = prefs.batterySaver
         birds = prefs.birds
+        nightMode = prefs.nightMode
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -80,6 +82,7 @@ final class SettingsModel: ObservableObject {
         skater = fresh.skater
         batterySaver = fresh.batterySaver
         birds = fresh.birds
+        nightMode = fresh.nightMode
         self.paused = paused
         (apply, setPaused, clearSnow, callSkater, setLaser, callBird) = keep
     }
@@ -95,6 +98,7 @@ struct SettingsView: View {
                 LabeledContent(L("Opacity")) { Slider(value: $model.opacity, in: 0.25...1) }
                 Toggle(L("Blizzard"), isOn: $model.blizzard)
                 Toggle(L("Melt Snow"), isOn: $model.melt)
+                Toggle(L("Night: bluer snow and fairy lights on the windows, 8pm to 6am"), isOn: $model.nightMode)
                 LabeledContent(L("Accumulate")) {
                     HStack {
                         Toggle(L("Ground"), isOn: $model.ground)

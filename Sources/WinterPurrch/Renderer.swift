@@ -630,6 +630,16 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
         else if (in.kind < 7.5) c = drawHeart(uv, px);
         else if (in.kind < 8.5) c = drawZ(uv, px);
         else if (in.kind < 9.5) c = drawSkater(uv, px, in.seed, in.facing, in.ex, in.ex2);
+        else if (in.kind > 11.5) {
+            // A fairy light: a coloured bulb with a soft glow, twinkling.
+            float tw = 0.65 + 0.35 * sin(u.time * (1.5 + fract(in.seed * 7.3) * 2.0) + in.seed * 40.0);
+            float3 col = in.ex.xyz;
+            float glow = exp(-d * d * 2.2) * 0.55 * tw;
+            float bulb = 1.0 - smoothstep(0.34, 0.42, length(uv * float2(1.0, 0.8) - float2(0.0, -0.05)));
+            float3 lit = mix(col, float3(1.0), 0.45 * bulb * tw);
+            float a = max(glow, bulb * (0.55 + 0.45 * tw));
+            c = float4(lit * a, a);
+        }
         else if (in.kind > 10.5) c = drawBird(uv, px, in.seed, in.facing, in.ex.x, in.ex.y);
         else {
             // The laser dot: a hot white core in a red glow.
@@ -645,7 +655,7 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
     if (in.kind < 0.5) {
         float core = 1.0 - smoothstep(0.3, 1.0, d);
         float a = core * in.alpha * u.opacity;
-        float3 c = float3(0.97, 0.985, 1.0);
+        float3 c = mix(float3(0.97, 0.985, 1.0), float3(0.8, 0.86, 1.0), u.pad0 * 0.5);
         return float4(c * a, a);
     }
     float aa = 1.5 / max(in.r, 1.0);
@@ -735,6 +745,8 @@ fragment float4 heapF(HOut in [[stage_in]], constant U& u [[buffer(0)]]) {
     float3 deep = float3(0.80, 0.86, 0.95);
     float3 c = mix(top, deep, smoothstep(0.0, 26.0, d));
     c -= (1.0 - smoothstep(0.0, 1.2, d)) * 0.02;
+    // Moonlit at night: a cool blue cast.
+    c = mix(c, c * float3(0.68, 0.76, 1.0), u.pad0 * 0.6);
     c -= hash21(floor(in.world * 0.8)) * 0.035;
     float2 cell = floor(in.world / 2.0);
     float sp = hash21(cell + 7.0);
@@ -829,7 +841,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     func encode(_ encoder: MTLRenderCommandEncoder, size: CGSize, scale: Float) {
         frame = (frame + 1) % 3
         var uniforms = Uniforms(size: SIMD2(Float(size.width), Float(size.height)),
-                                time: simulation.time, scale: scale, opacity: simulation.settings.opacity)
+                                time: simulation.time, scale: scale, opacity: simulation.settings.opacity,
+                                pad0: simulation.night)
 
         if !heap.isEmpty {
             let buffer = ensure(&heapBuffers, frame, bytes: heap.count * MemoryLayout<HeapVertex>.stride)
@@ -941,6 +954,23 @@ final class Renderer: NSObject, MTKViewDelegate {
             let c = sk.p + SIMD2(0, sk.unit * 1.25)
             sprites.append(SpriteInstance(px: c.x, py: c.y, r: sk.unit, alpha: 1, kind: 9, seed: sk.phase, ext: 2.0,
                                           pad: sk.facing, a: sk.crouch, b: sk.flip, c: sk.spin, d: sk.tilt, e: sk.grab))
+        }
+        if sim.night > 0.05 {
+            // Strings of fairy lights along the tops of the windows.
+            let palette: [SIMD3<Float>] = [SIMD3(1, 0.25, 0.25), SIMD3(1, 0.8, 0.25), SIMD3(0.3, 0.95, 0.4), SIMD3(0.35, 0.6, 1)]
+            for l in sim.ledges.values where l.kind == .window {
+                let every = 16
+                var i = every / 2
+                while i < l.h.count {
+                    defer { i += every }
+                    guard l.visible[i] else { continue }
+                    let n = (i / every + l.id) % palette.count
+                    let col = palette[n]
+                    sprites.append(SpriteInstance(px: l.centerX(i), py: l.y + l.h[i] + 5, r: 5.5, alpha: sim.night,
+                                                  kind: 12, seed: Float(i) * 0.37 + Float(l.id), ext: 3, pad: 1,
+                                                  a: col.x, b: col.y, c: col.z))
+                }
+            }
         }
         if let b = sim.bird {
             let c = b.p + SIMD2(0, b.unit * 0.6)

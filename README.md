@@ -35,6 +35,8 @@ WinterPurrch runs in the background with a settings window and a menu bar icon. 
 - **Laser pointer:** press ⌃⌥L anywhere (or use the settings) and a red dot follows your cursor. The cats run to it, crouch with their bottoms wiggling and pounce, leap up onto the window it is on, hop over the Dock to reach it, and sit staring when it is out of reach.
 - **Birds:** now and then a robin flies in to hop about on a window, the Dock or the ground, pecking at the snow. The cats creep up on it, crouch and pounce, and it always gets away just in time. Rush the cursor at it and it flies off too.
 - **A skater:** once the snow is deep, a kid in a bobble hat skates in, carving a groove and throwing up powder, pops kickflips, 360s and grabs, ollies up onto the Dock to grind along it, and rides off the other side. Cats in the way leap aside. You can also call the skater from the settings.
+- **Rolling in the snow:** now and then a cat flops on its back in a deep drift and wriggles about, paws going, until its fur is full of snow, then shakes it off.
+- **Night:** from 8 in the evening to 6 in the morning the snow takes on a moonlit blue, strings of fairy lights twinkle along the tops of the windows, and the cats nap more.
 - **Blizzard mode:** heavier snow and gusting wind.
 - **Light on resources:** about 7% of one core and around 50 MB of memory.
 
@@ -58,6 +60,7 @@ The window and the menu offer the same settings:
 | Birds / Call a Bird | Let a robin drop by now and then, or call one now |
 | Skater / Call the Skater | Let the skater visit when the snow is deep, or bring it in now |
 | Melt | Drifts slowly thaw so they don't take over the screen |
+| Night | Moonlit snow and fairy lights on the windows from 8pm to 6am |
 | Clear Snow | Removes all settled snow and snowballs |
 | Pause | Stops the snow |
 | Open at Login / Show in Screenshots | Start with your Mac; let screenshots and screen sharing include the snow |

@@ -4,7 +4,7 @@ import simd
 /// The cat that lives in the snow: it wanders the drifts, climbs onto windows, plays in the snow on the Dock,
 /// fetches coffee, jumps when it is hit and purrs when it is petted.
 struct Cat {
-    enum State { case walking, sitting, sleeping, playing, airborne, away, shaking, flopped, digging, grooming }
+    enum State { case walking, sitting, sleeping, playing, airborne, away, shaking, flopped, digging, grooming, rolling }
     enum Errand: Equatable { case none, leaving, returning(target: Float, ledge: Int) }
 
     var p: SIMD2<Float>                 // the point on the ground between its feet
@@ -67,7 +67,7 @@ struct Cat {
         case .airborne: return 3
         case .playing: return 4
         case .shaking: return 5
-        case .flopped: return 6
+        case .flopped, .rolling: return 6
         case .digging: return 7
         case .grooming: return groomBack ? 10 : 9
         }
@@ -643,6 +643,7 @@ extension SnowSimulation {
                 beginShaking(&c)
             }
         case .digging: dig(&c, l, dt)
+        case .rolling: rollInSnow(&c, l, dt)
         case .grooming:
             c.timer -= dt
             if c.timer <= 0 {
@@ -797,7 +798,9 @@ extension SnowSimulation {
             wander(&c)
         } else if roll < 0.2, let target = climbTarget(from: c, active) {
             jump(&c, to: target)
-        } else if roll < 0.42 {
+        } else if roll < 0.5, Float.random(in: 0..<1) < 0.25, depth(under: c, on: l) > 5 {
+            startRolling(&c)
+        } else if roll < 0.42 + night * 0.25 {
             c.state = .sleeping
             c.timer = rand(15, 35)
         } else {
@@ -846,6 +849,33 @@ extension SnowSimulation {
         c.state = .grooming
         c.groomBack = Bool.random()
         c.timer = rand(3, 6)
+    }
+
+    /// On its back in the drift, wriggling from side to side with its paws going.
+    private func startRolling(_ c: inout Cat) {
+        c.state = .rolling
+        c.timer = rand(3, 5)
+        c.phase = 0
+        c.swatTimer = 0
+    }
+
+    private func rollInSnow(_ c: inout Cat, _ l: Ledge, _ dt: Float) {
+        c.timer -= dt
+        c.phase += dt * 5
+        c.angle = sin(c.phase) * 0.4
+        c.snowy = min(0.9, c.snowy + dt * 0.25)
+        c.swatTimer -= dt
+        if c.swatTimer <= 0 {
+            c.swatTimer = 0.25
+            let x = l.x0 + c.offset
+            let side: Float = sin(c.phase) > 0 ? 1 : -1
+            kick(at: SIMD2(x + side * c.size * 0.7, c.p.y), toward: side, amount: 10, on: l)
+        }
+        if c.timer <= 0 {
+            // Up, and the snow shaken out of its fur.
+            c.angle = 0
+            beginShaking(&c)
+        }
     }
 
     private func startDigging(_ c: inout Cat) {
@@ -1113,6 +1143,7 @@ extension SnowSimulation {
         switch action {
         case "flop": flop(&c, on: l)
         case "dig": startDigging(&c)
+        case "roll": startRolling(&c)
         case "tumble":
             c.state = .airborne
             c.ledge = nil

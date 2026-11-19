@@ -319,6 +319,21 @@ enum SelfTest {
         }
         print("selftest: bird: \(birdFrames) frames, perched \(perched), cats creeping \(sneaking), crouched \(crouching), gone=\(sim.bird == nil)")
 
+        // Rolling in the snow, then night falls: blue snow and fairy lights.
+        if let i = sim.cats.indices.first(where: { sim.cats[$0].ledge != nil }) {
+            let cat0 = sim.cats[0]
+            sim.cats[0] = sim.cats[i]
+            sim.cats[i] = cat0
+            sim.catDo("roll")
+            run(0.9)
+            catLine("rolling")
+            shot("cat-roll")
+        }
+        sim.night = 1
+        run(1)
+        shot("night")
+        sim.night = 0
+
         // The skater: rides in, pops tricks, grinds the Dock and leaves.
         sim.callSkater()
         var frames = 0, airborne = 0, onDock = 0, tricks = Set<String>()

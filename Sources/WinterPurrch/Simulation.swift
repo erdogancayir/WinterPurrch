@@ -120,6 +120,8 @@ final class SnowSimulation {
     var skaterCooldown: Float = 90
     /// The laser pointer: a red dot at the cursor that the cats chase.
     var laserOn = false
+    /// 0 by day, 1 at night: tints the snow, lights up the windows and makes the cats sleepier.
+    var night: Float = 0
     var bird: Bird?
     var birdCooldown: Float = 50
     var laser: SIMD2<Float>? { laserOn ? cursor : nil }
