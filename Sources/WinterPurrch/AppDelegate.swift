@@ -1,0 +1,243 @@
+import AppKit
+import ServiceManagement
+
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private let prefs = Preferences.shared
+    private var statusItem: NSStatusItem!
+    private var screens: [ScreenSnow] = []
+    private var pollTimer: Timer?
+    private var lastPoll = CACurrentMediaTime()
+    private var lastWindows: [Int: CGRect] = [:]
+    private var busyUntil: CFTimeInterval = 0
+    private var tick = 0
+    private var spaceChangedAt: CFTimeInterval = 0
+    private var dockFrame: CGRect?
+    private var dockCheckedAt: CFTimeInterval = 0
+    private var paused = false
+    private var screensAsleep = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.button?.image = NSImage(systemSymbolName: "snowflake", accessibilityDescription: "WinterPurrch")
+        let menu = NSMenu()
+        menu.delegate = self
+        statusItem.menu = menu
+
+        rebuildScreens()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.poll() }
+        RunLoop.main.add(pollTimer!, forMode: .common)
+
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) {
+            [weak self] _ in self?.rebuildScreens()
+        }
+        center.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.applyFrameRate()
+        }
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) {
+            [weak self] _ in self?.spaceChangedAt = CACurrentMediaTime()
+        }
+        workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) {
+            [weak self] _ in self?.screensAsleep = true; self?.refreshVisibility()
+        }
+        workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) {
+            [weak self] _ in self?.screensAsleep = false; self?.refreshVisibility()
+        }
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.dockCheckedAt = 0
+            }
+        }
+    }
+
+    // MARK: - Screens
+
+    private func rebuildScreens() {
+        screens.forEach { $0.close() }
+        screens = NSScreen.screens.compactMap { ScreenSnow(screen: $0, settings: prefs.settings) }
+        dockCheckedAt = 0
+        applyFrameRate()
+        refreshVisibility()
+    }
+
+    private func refreshVisibility() {
+        for s in screens {
+            if paused || screensAsleep { s.hide() } else { s.show(screenshots: prefs.screenshots) }
+        }
+    }
+
+    private func applyFrameRate() {
+        let fps = ProcessInfo.processInfo.isLowPowerModeEnabled ? 30 : 60
+        screens.forEach { $0.setFrameRate(fps) }
+    }
+
+    private func applySettings() {
+        let s = prefs.settings
+        screens.forEach { $0.simulation.applySettings(s) }
+        lastWindows.removeAll()
+        busyUntil = CACurrentMediaTime() + 1
+    }
+
+    // MARK: - Windows
+
+    /// Reads the windows often while they move and seldom while all is still.
+    private func poll() {
+        guard !paused, !screensAsleep else { return }
+        let now = CACurrentMediaTime()
+        tick += 1
+        if now > busyUntil && tick % 5 != 0 { return }
+        let windows = WindowList.current()
+        var map: [Int: CGRect] = [:]
+        for w in windows { map[w.id] = w.frame }
+        if map != lastWindows { busyUntil = now + 1.2 }
+        lastWindows = map
+
+        if now - dockCheckedAt > 3 {
+            dockCheckedAt = now
+            dockFrame = DockLocator.frame()
+        }
+        let dt = Float(now - lastPoll)
+        lastPoll = now
+        let keep = now - spaceChangedAt < 1.5
+        for s in screens {
+            s.updateSurfaces(windows: windows, dock: dockFrame, dt: dt, keepVanished: keep)
+        }
+    }
+
+    // MARK: - Menu
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+
+        let title = NSMenuItem(title: "WinterPurrch", action: nil, keyEquivalent: "")
+        title.isEnabled = false
+        menu.addItem(title)
+        menu.addItem(sliderItem(L("Intensity"), value: prefs.intensity, range: 0.05...1) { [weak self] v in
+            self?.prefs.intensity = v
+            self?.applySettings()
+        })
+        menu.addItem(sliderItem(L("Opacity"), value: prefs.opacity, range: 0.25...1) { [weak self] v in
+            self?.prefs.opacity = v
+            self?.applySettings()
+        })
+        menu.addItem(.separator())
+
+        let accumulate = NSMenuItem(title: L("Accumulate"), action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        sub.addItem(toggle(L("Ground"), prefs.ground) { $0.ground.toggle() })
+        sub.addItem(toggle(L("Dock"), prefs.dock) { $0.dock.toggle() })
+        sub.addItem(toggle(L("Windows"), prefs.windows) { $0.windows.toggle() })
+        accumulate.submenu = sub
+        menu.addItem(accumulate)
+        menu.addItem(toggle(L("Blizzard"), prefs.blizzard) { $0.blizzard.toggle() })
+        menu.addItem(toggle(L("Melt Snow"), prefs.melt) { $0.melt.toggle() })
+        menu.addItem(.separator())
+
+        let hint = NSMenuItem(title: L("Snowball: hold ⌥, grab the snow and throw"), action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        menu.addItem(hint)
+        let hint2 = NSMenuItem(title: L("Stack the balls to build a snowman ☃︎"), action: nil, keyEquivalent: "")
+        hint2.isEnabled = false
+        menu.addItem(hint2)
+        menu.addItem(item(L("Clear Snow"), #selector(clearSnow)))
+        menu.addItem(item(paused ? L("Resume") : L("Pause"), #selector(togglePause)))
+        menu.addItem(.separator())
+
+        let settings = NSMenuItem(title: L("Settings"), action: nil, keyEquivalent: "")
+        let more = NSMenu()
+        more.addItem(toggle(L("Show in Screenshots"), prefs.screenshots) { $0.screenshots.toggle() })
+        let login = item(L("Open at Login"), #selector(toggleLogin))
+        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        more.addItem(login)
+        if !DockLocator.trusted {
+            more.addItem(item(L("Measure the Dock Exactly (Accessibility)…"), #selector(askAccessibility)))
+        }
+        settings.submenu = more
+        menu.addItem(settings)
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: L("Quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    private func item(_ title: String, _ action: Selector) -> NSMenuItem {
+        let i = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        i.target = self
+        return i
+    }
+
+    private var toggles: [NSMenuItem: (Preferences) -> Void] = [:]
+
+    private func toggle(_ title: String, _ on: Bool, _ change: @escaping (Preferences) -> Void) -> NSMenuItem {
+        let i = item(title, #selector(toggled(_:)))
+        i.state = on ? .on : .off
+        toggles[i] = change
+        return i
+    }
+
+    @objc private func toggled(_ sender: NSMenuItem) {
+        toggles[sender]?(prefs)
+        toggles.removeAll()
+        applySettings()
+        refreshVisibility()
+    }
+
+    private func sliderItem(_ title: String, value: Float, range: ClosedRange<Float>,
+                            onChange: @escaping (Float) -> Void) -> NSMenuItem {
+        let i = NSMenuItem()
+        i.view = SliderMenuView(title: title, value: value, range: range, onChange: onChange)
+        return i
+    }
+
+    @objc private func clearSnow() { screens.forEach { $0.simulation.clear() } }
+
+    @objc private func togglePause() {
+        paused.toggle()
+        refreshVisibility()
+    }
+
+    @objc private func toggleLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled { try service.unregister() } else { try service.register() }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = L("Couldn't set Open at Login")
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
+    @objc private func askAccessibility() {
+        DockLocator.requestAccess()
+        dockCheckedAt = 0
+    }
+}
+
+/// A labelled slider inside the menu.
+final class SliderMenuView: NSView {
+    private let onChange: (Float) -> Void
+
+    init(title: String, value: Float, range: ClosedRange<Float>, onChange: @escaping (Float) -> Void) {
+        self.onChange = onChange
+        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 46))
+        let label = NSTextField(labelWithString: title)
+        label.font = .menuFont(ofSize: 0)
+        label.textColor = .secondaryLabelColor
+        label.frame = NSRect(x: 14, y: 24, width: 230, height: 18)
+        addSubview(label)
+        let slider = NSSlider(value: Double(value), minValue: Double(range.lowerBound),
+                              maxValue: Double(range.upperBound), target: nil, action: nil)
+        slider.frame = NSRect(x: 14, y: 2, width: 232, height: 22)
+        slider.isContinuous = true
+        slider.target = self
+        slider.action = #selector(changed(_:))
+        addSubview(slider)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func changed(_ sender: NSSlider) { onChange(Float(sender.doubleValue)) }
+}
+
+/// A menu string in the user's language.
+func L(_ english: String) -> String { NSLocalizedString(english, comment: "") }
