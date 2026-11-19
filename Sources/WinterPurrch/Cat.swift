@@ -39,6 +39,9 @@ struct Cat {
     var social: Social = .none          // washing its friend, or being washed
     var seeking = false                 // on its way to its friend
     var stroking: Float = 0             // how long the cursor has been stroking it
+    var hunting = false                 // after the laser dot
+    var huntCrouch: Float = 0           // time spent crouched, bottom wiggling, before pouncing
+    var huntJump: Float = 0             // pause between leaps after the dot
     var deepSleep = false               // stroked to sleep: stays asleep until clicked
     var look: Float = 0                 // 1 looking at the viewer, 0 looking where it is going
     var lookTime: Float = 0
@@ -255,6 +258,7 @@ extension SnowSimulation {
             c.nextCoffee -= dt
             c.nextPlay -= dt
         }
+        if let dot = laser { hunt(&c, dot, dt, active) } else if c.hunting { c.hunting = false }
 
         switch c.state {
         case .airborne: fly(&c, dt, active)
@@ -262,6 +266,83 @@ extension SnowSimulation {
         default: grounded(&c, dt, active)
         }
         pet(&c, dt)
+    }
+
+    // MARK: - The laser dot
+
+    /// Chases the red dot: runs to it along its ledge, crouches with its bottom wiggling, pounces; leaps up to the
+    /// ledge it is on; sits and stares at it in mid-air. A cat stroked to sleep sleeps on.
+    private func hunt(_ c: inout Cat, _ dot: SIMD2<Float>, _ dt: Float, _ active: [Ledge]) {
+        guard c.errand == .none, !c.carrying, !c.deepSleep,
+              [.walking, .sitting, .sleeping, .playing, .digging, .grooming].contains(c.state),
+              let id = c.ledge, let l = ledges[id]
+        else { return }
+        if c.state == .sleeping && simd_distance(dot, c.center) > 320 { return }
+        c.hunting = true
+        c.social = .none
+        c.seeking = false
+        c.huntJump -= dt
+
+        // The surface the dot is on, if any: just below it.
+        var spot: Ledge?
+        var best = -Float.infinity
+        for o in active {
+            guard let col = o.column(at: dot.x), o.visible[col] else { continue }
+            let top = o.y + o.h[col]
+            if top <= dot.y + 15 && top >= dot.y - 70 && top > best {
+                best = top
+                spot = o
+            }
+        }
+        let side: Float = dot.x >= c.p.x ? 1 : -1
+        guard let target = spot else {
+            // Out of reach in the air: sit and stare at it.
+            c.state = .sitting
+            c.timer = 1
+            c.facing = side
+            c.huntCrouch = 0
+            return
+        }
+        if target.id != l.id {
+            if c.huntJump <= 0, let col = target.column(at: dot.x), abs(dot.x - c.p.x) < 420, target.y - c.p.y < 340 {
+                c.huntJump = 1
+                jump(&c, to: SIMD2(dot.x, target.y + target.h[col]))
+            } else {
+                c.state = .walking
+                c.facing = side
+                c.timer = 2
+                c.fleeing = 0.25
+                c.descend = target.y < c.p.y
+            }
+            return
+        }
+        let dx = dot.x - c.p.x
+        // The Dock in the way along the ground: hop up onto it and carry on from there.
+        if l.kind == .ground, let dock = ledges[Self.dockID], min(c.p.x, dot.x) < dock.x0, max(c.p.x, dot.x) > dock.x0 + dock.width {
+            let edge = side > 0 ? dock.x0 : dock.x0 + dock.width
+            if abs(edge - c.p.x) < 160, c.huntJump <= 0, let col = dock.column(at: edge + side * c.size * 1.5) {
+                c.huntJump = 1
+                jump(&c, to: SIMD2(edge + side * c.size * 1.5, dock.y + dock.h[col]))
+                return
+            }
+        }
+        if abs(dx) > c.size * 1.8 {
+            c.state = .walking
+            c.facing = side
+            c.timer = 2
+            c.fleeing = 0.25            // at a run
+            c.huntCrouch = 0
+        } else {
+            c.state = .playing
+            c.facing = side
+            c.timer = 2
+            c.swatTimer = 1
+            c.huntCrouch += dt
+            if c.huntCrouch > rand(0.5, 0.9) {
+                c.huntCrouch = 0
+                hop(&c, SIMD2(dx * 3.2, rand(280, 360)))
+            }
+        }
     }
 
     // MARK: - Friends
@@ -843,7 +924,7 @@ extension SnowSimulation {
 
     // MARK: - Jumps
 
-    private func hop(_ c: inout Cat, _ v: SIMD2<Float>) {
+    func hop(_ c: inout Cat, _ v: SIMD2<Float>) {
         c.state = .airborne
         c.ledge = nil
         c.v = v

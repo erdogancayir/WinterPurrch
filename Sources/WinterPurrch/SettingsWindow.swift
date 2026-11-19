@@ -9,6 +9,9 @@ final class SettingsModel: ObservableObject {
     var setPaused: (Bool) -> Void = { _ in }
     var clearSnow: () -> Void = {}
     var callSkater: () -> Void = {}
+    var setLaser: (Bool) -> Void = { _ in }
+    /// Mirrors the laser pointer's state, which the shortcut can also change.
+    @Published var laserShown = false
 
     @Published var intensity: Double { didSet { prefs.intensity = Float(intensity); apply() } }
     @Published var opacity: Double { didSet { prefs.opacity = Float(opacity); apply() } }
@@ -57,7 +60,7 @@ final class SettingsModel: ObservableObject {
     /// Picks up changes made from the menu bar.
     func reload(paused: Bool) {
         let fresh = SettingsModel()
-        let keep = (apply, setPaused, clearSnow, callSkater)
+        let keep = (apply, setPaused, clearSnow, callSkater, setLaser)
         apply = {}
         setPaused = { _ in }
         intensity = fresh.intensity
@@ -74,7 +77,7 @@ final class SettingsModel: ObservableObject {
         skater = fresh.skater
         batterySaver = fresh.batterySaver
         self.paused = paused
-        (apply, setPaused, clearSnow, callSkater) = keep
+        (apply, setPaused, clearSnow, callSkater, setLaser) = keep
     }
 }
 
@@ -101,6 +104,9 @@ struct SettingsView: View {
             Section(L("Cats")) {
                 Toggle(L("Cat"), isOn: $model.cat)
                 Toggle(L("Friend"), isOn: $model.friend).disabled(!model.cat)
+                Toggle(L("Laser pointer for the cats (⌃⌥L from anywhere)"), isOn: Binding(
+                    get: { model.laserShown }, set: { model.setLaser($0) }
+                )).disabled(!model.cat)
                 LabeledContent(L("Cat Size")) { Slider(value: $model.catSize, in: 16...80) }.disabled(!model.cat)
                 Text(L("Click a cat to startle it; rest or stroke the cursor on it to pet it. Hold ⌥ and drag snow to make snowballs."))
                     .font(.footnote)

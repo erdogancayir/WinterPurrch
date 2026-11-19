@@ -580,7 +580,16 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
         else if (in.kind < 6.5) c = drawMug(uv, px, in.ex.x, u.time, in.seed);
         else if (in.kind < 7.5) c = drawHeart(uv, px);
         else if (in.kind < 8.5) c = drawZ(uv, px);
-        else c = drawSkater(uv, px, in.seed, in.facing, in.ex, in.ex2);
+        else if (in.kind < 9.5) c = drawSkater(uv, px, in.seed, in.facing, in.ex, in.ex2);
+        else {
+            // The laser dot: a hot white core in a red glow.
+            float flicker = 0.92 + 0.08 * sin(u.time * 40.0);
+            float glow = exp(-d * d * 1.6) * 0.75 * flicker;
+            float core = 1.0 - smoothstep(0.32, 0.42, d);
+            float3 col = mix(float3(1.0, 0.1, 0.12), float3(1.0, 0.9, 0.9), core * (1.0 - smoothstep(0.0, 0.25, d)));
+            float a = max(glow, core);
+            c = float4(col * a, a);
+        }
         return c * in.alpha;
     }
     if (in.kind < 0.5) {
@@ -882,6 +891,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             let c = sk.p + SIMD2(0, sk.unit * 1.25)
             sprites.append(SpriteInstance(px: c.x, py: c.y, r: sk.unit, alpha: 1, kind: 9, seed: sk.phase, ext: 2.0,
                                           pad: sk.facing, a: sk.crouch, b: sk.flip, c: sk.spin, d: sk.tilt, e: sk.grab))
+        }
+        if let dot = sim.laser {
+            sprites.append(SpriteInstance(px: dot.x, py: dot.y, r: 7, alpha: 1, kind: 10, seed: 0, ext: 2.6, pad: 1))
         }
         for h in sim.hearts {
             let grow: Float = h.isZ ? 0.7 + (1 - h.life) * 0.6 : 1

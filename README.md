@@ -32,6 +32,7 @@ WinterPurrch runs in the background with a settings window and a menu bar icon. 
 - **A friend:** a chubby ginger tabby with short fur and amber eyes keeps it company. The two go looking for each other, and when they meet they touch noses, wash each other's heads, curl up together for a nap, play-fight, or play tag. Sometimes one just tags along behind the other.
 - **Their own business:** they mostly look where they're going and only now and then glance up at you.
 - **Adjustable size:** a Cat Size slider in the menu, and a Friend toggle.
+- **Laser pointer:** press ⌃⌥L anywhere (or use the settings) and a red dot follows your cursor. The cats run to it, crouch with their bottoms wiggling and pounce, leap up onto the window it is on, hop over the Dock to reach it, and sit staring when it is out of reach.
 - **A skater:** once the snow is deep, a kid in a bobble hat skates in, carving a groove and throwing up powder, pops kickflips, 360s and grabs, ollies up onto the Dock to grind along it, and rides off the other side. Cats in the way leap aside. You can also call the skater from the settings.
 - **Blizzard mode:** heavier snow and gusting wind.
 - **Light on resources:** about 7% of one core and around 50 MB of memory.
@@ -52,6 +53,7 @@ The window and the menu offer the same settings:
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |
 | Cat / Friend / Cat Size | Show or hide the cat and its friend, and set their size |
+| Laser pointer (⌃⌥L) | A red dot at the cursor for the cats to chase |
 | Skater / Call the Skater | Let the skater visit when the snow is deep, or bring it in now |
 | Melt | Drifts slowly thaw so they don't take over the screen |
 | Clear Snow | Removes all settled snow and snowballs |

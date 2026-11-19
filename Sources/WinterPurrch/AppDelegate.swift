@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import IOKit.ps
 import ServiceManagement
 
@@ -17,6 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var paused = false
     private var screensAsleep = false
     private let settingsWindow = SettingsWindowController()
+    private var laserKey: HotKey?
+    private var laserOn = false {
+        didSet {
+            screens.forEach { $0.simulation.laserOn = laserOn }
+            settingsWindow.model.laserShown = laserOn
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -38,6 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         model.clearSnow = { [weak self] in self?.clearSnow() }
         model.callSkater = { [weak self] in self?.callSkater() }
+        model.setLaser = { [weak self] on in self?.laserOn = on }
+        // ⌃⌥L: the laser pointer, from anywhere.
+        laserKey = HotKey(keyCode: UInt32(kVK_ANSI_L), modifiers: UInt32(controlKey | optionKey), id: 1) { [weak self] in
+            self?.toggleLaser()
+        }
         // The first time, show where everything is: the menu bar icon may well be hidden behind the notch.
         if !UserDefaults.standard.bool(forKey: "welcomed") {
             UserDefaults.standard.set(true, forKey: "welcomed")
@@ -96,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !screens.isEmpty { saveScene() }
         screens.forEach { $0.close() }
         screens = NSScreen.screens.compactMap { ScreenSnow(screen: $0, settings: prefs.settings) }
+        screens.forEach { $0.simulation.laserOn = laserOn }
         let saved = SceneStore.load()
         for s in screens {
             if let state = saved[SceneStore.key(for: s.screen)] { s.simulation.restore(state) }
@@ -223,6 +237,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(hint3)
         menu.addItem(item(L("Clear Snow"), #selector(clearSnow)))
         if prefs.skater { menu.addItem(item(L("Call the Skater"), #selector(callSkater))) }
+        let laser = item(L("Laser Pointer (⌃⌥L)"), #selector(toggleLaser))
+        laser.state = laserOn ? .on : .off
+        menu.addItem(laser)
         menu.addItem(item(paused ? L("Resume") : L("Pause"), #selector(togglePause)))
         menu.addItem(.separator())
 
@@ -269,6 +286,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         i.view = SliderMenuView(title: title, value: value, range: range, onChange: onChange)
         return i
     }
+
+    @objc func toggleLaser() { laserOn.toggle() }
 
     @objc func callSkater() { screens.forEach { $0.simulation.callSkater() } }
 

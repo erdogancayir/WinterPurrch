@@ -117,6 +117,9 @@ final class SnowSimulation {
     var friendSeek: Float = 20
     var skater: Skater?
     var skaterCooldown: Float = 90
+    /// The laser pointer: a red dot at the cursor that the cats chase.
+    var laserOn = false
+    var laser: SIMD2<Float>? { laserOn ? cursor : nil }
     /// The first cat, for code that deals with one.
     var cat: Cat? {
         get { cats.first }

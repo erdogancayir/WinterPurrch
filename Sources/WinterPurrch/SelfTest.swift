@@ -266,6 +266,38 @@ enum SelfTest {
             shot("nap")
         }
 
+        // The laser dot: chased along the ground, followed up onto a window, stared at in the air.
+        if let ground = sim.ledges[SnowSimulation.groundID] {
+            for i in sim.cats.indices {
+                sim.cats[i].state = .sitting
+                sim.cats[i].deepSleep = false
+                sim.cats[i].ledge = ground.id
+                sim.cats[i].offset = 80 + Float(i) * 60
+                sim.cats[i].lastLedge = SIMD2(ground.x0, ground.y)
+                sim.cats[i].errand = .none
+            }
+            sim.laserOn = true
+            let gx: Float = 820
+            var pounces = 0
+            for k in 0..<(60 * 6) {
+                let gy = groundTop(sim, at: gx) + 4
+                let wasAir = sim.cats.map { $0.state == .airborne }
+                run(1.0 / 60) { _ in SIMD2(gx, gy) }
+                for (i, c) in sim.cats.enumerated() where c.state == .airborne && !wasAir[i] { pounces += 1 }
+                if k == 200 { shot("laser-ground") }
+            }
+            print("selftest: laser on the ground: cats at " + sim.cats.map { "\(Int($0.p.x))" }.joined(separator: ", ")
+                  + " (dot at \(Int(gx))), \(pounces) leaps/pounces")
+            let wx = Float(windowA.midX), wy = Float(windowA.maxY) + 30
+            run(4) { _ in SIMD2(wx, wy) }
+            print("selftest: laser on window A: cats on ledges " + sim.cats.map { "\($0.ledge ?? 0)" }.joined(separator: ", "))
+            shot("laser-window")
+            run(1.5) { _ in SIMD2(450, 480) }
+            print("selftest: laser in the air: " + sim.cats.map { "\($0.state)" }.joined(separator: ", "))
+            sim.laserOn = false
+            run(1)
+        }
+
         // The skater: rides in, pops tricks, grinds the Dock and leaves.
         sim.callSkater()
         var frames = 0, airborne = 0, onDock = 0, tricks = Set<String>()
