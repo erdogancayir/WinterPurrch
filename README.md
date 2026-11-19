@@ -19,7 +19,7 @@ WinterPurrch lives in the menu bar. It draws with Metal in a transparent overlay
 - **Grooming:** they lick a paw and wash their face with it, or turn round to lick their back, especially after shaking off a snowball.
 - **Clumsy:** now and then it trips and flops over with its legs in the air and its tongue out, or misjudges the edge of a window and tumbles off. It gets up and shakes the snow off as if nothing happened.
 - **Digging:** it paws at deep drifts, throwing the snow back between its legs until it has dug a hole.
-- **Startle and pet:** click the cat and it hops up with its fur on end, then dashes off. Hit it with a snowball and it shakes the snow out of its fur. Rest the cursor on it and it sits down and purrs, with hearts; stroke it back and forth for a few seconds and it drifts off to sleep.
+- **Startle and pet:** click the cat and it hops up with its fur on end, then dashes off. Hit it with a snowball and it shakes the snow out of its fur. Rest the cursor on it and it sits down and purrs, with hearts; stroke it back and forth for a few seconds and it drifts off to sleep, curled up with its tail round its paws, and stays asleep until you click it awake.
 - **A friend:** a chubby ginger tabby with short fur and amber eyes keeps it company. The two go looking for each other, and when they meet they touch noses, wash each other's heads, curl up together for a nap, play-fight, or play tag. Sometimes one just tags along behind the other.
 - **Their own business:** they mostly look where they're going and only now and then glance up at you.
 - **Adjustable size:** a Cat Size slider in the menu, and a Friend toggle.

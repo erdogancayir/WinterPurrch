@@ -39,6 +39,7 @@ struct Cat {
     var social: Social = .none          // washing its friend, or being washed
     var seeking = false                 // on its way to its friend
     var stroking: Float = 0             // how long the cursor has been stroking it
+    var deepSleep = false               // stroked to sleep: stays asleep until clicked
     var look: Float = 0                 // 1 looking at the viewer, 0 looking where it is going
     var lookTime: Float = 0
     var lookCooldown: Float = rand(4, 10)
@@ -126,8 +127,18 @@ extension SnowSimulation {
     /// A click: the cat jumps; a mug gets drunk. Returns whether something was there.
     func poke(at point: SIMD2<Float>) -> Bool {
         if let i = cats.firstIndex(where: { $0.contains(point) }) {
-            // A cat already in the air can't be startled again.
-            if cats[i].state != .airborne { startle(&cats[i], from: point.x) }
+            if cats[i].state == .sleeping {
+                // Woken gently: it sits up and looks at you.
+                cats[i].state = .sitting
+                cats[i].deepSleep = false
+                cats[i].stroking = 0
+                cats[i].timer = rand(2, 3)
+                cats[i].lookTime = 2.5
+                friendSeek = max(friendSeek, 8)
+            } else if cats[i].state != .airborne {
+                // A cat already in the air can't be startled again.
+                startle(&cats[i], from: point.x)
+            }
             return true
         }
         if let i = mugs.firstIndex(where: { simd_distance($0.center, point) < Mug.size * 1.6 }) {
@@ -148,6 +159,7 @@ extension SnowSimulation {
             c.errand = .none
             c.snowy = 1
             c.startle = 0.6
+            c.deepSleep = false
             c.facing = velocity.x >= 0 ? 1 : -1
             if c.state != .airborne { beginShaking(&c) }
             cats[i] = c
@@ -164,6 +176,7 @@ extension SnowSimulation {
 
     /// A fright from `x`: a short hop straight up with its fur on end, then a dash the other way.
     private func startle(_ c: inout Cat, from x: Float) {
+        c.deepSleep = false
         c.social = .none
         c.seeking = false
         if c.carrying { dropCarriedMug(c) }
@@ -501,7 +514,7 @@ extension SnowSimulation {
         case .walking: walk(&c, l, dt, active)
         case .sitting: sit(&c, l, dt, active)
         case .sleeping:
-            c.timer -= dt
+            if !c.deepSleep { c.timer -= dt }
             if c.timer <= 0 { c.stroking = 0 }
             // Little z's drift up from a sleeping cat.
             c.swatTimer -= dt
@@ -910,9 +923,10 @@ extension SnowSimulation {
         c.petting += dt
         if speed > 40 { c.stroking += dt }
         // Stroked long enough, it purrs itself to sleep.
-        if c.stroking > 2.5 && c.state != .sleeping {
+        if c.stroking > 2.5 && !c.deepSleep {
             c.state = .sleeping
-            c.timer = rand(20, 35)
+            c.deepSleep = true
+            c.timer = 1
             c.social = .none
             c.swatTimer = 0.4
         }

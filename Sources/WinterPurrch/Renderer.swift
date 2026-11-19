@@ -319,7 +319,7 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
         float2 bc = float2(0.0, 0.66), br = float2(0.74, 0.36);
         float2 hc = float2(0.74, 1.12);
         float s = 0.95;
-        if (sleep) { bc = float2(0.0, 0.36); br = float2(0.84, 0.36); hc = float2(0.66, 0.52); }
+        if (sleep) { bc = float2(-0.05, 0.38); br = float2(0.84, 0.37); hc = float2(0.62, 0.6); s = 0.88; }
         if (air)   { bc = float2(0.0, 0.85); br = float2(0.88, 0.32) * (1.0 + 0.12 * ex.y); hc = float2(0.86, 1.18); }
         if (play)  { bc = float2(-0.05, 0.56); br = float2(0.78, 0.32); hc = float2(0.78, 0.82); }
         if (dig)   { bc = float2(-0.05, 0.56); br = float2(0.78, 0.32); hc = float2(0.8, 0.68); }
@@ -327,6 +327,7 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
         if (flop)  { bc = float2(0.0, 0.34); br = float2(0.84, 0.32); hc = float2(0.86, 0.46); }
 
         br.y *= k.chub;
+        if (sleep) br.y *= 1.0 + 0.035 * sin(time * 2.2);   // breathing
         float body = sdEll(q, bc, br);
         if (play || dig) body = min(body, sdEll(q, float2(-0.52, 0.76), float2(0.36, 0.34)));
         body -= 0.03 * k.fluff * fur(q, bc, 22.0);
@@ -368,7 +369,8 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
         }
 
         float2 t0, t1, t2;
-        if (sleep || groomBack) { t0 = float2(-0.78, 0.25); t1 = float2(-0.55, 0.06); t2 = float2(0.3, 0.08); }
+        if (sleep) { t0 = float2(-0.6, 0.4); t1 = t0; t2 = t0; }   // drawn wrapped round the front instead
+        else if (groomBack) { t0 = float2(-0.78, 0.25); t1 = float2(-0.55, 0.06); t2 = float2(0.3, 0.08); }
         else if (flop) { t0 = float2(-0.78, 0.3); t1 = float2(-1.08, 0.16); t2 = float2(-1.32, 0.12 + 0.05 * sway); }
         else {
             t0 = bc + float2(-br.x * 0.9, br.y * 0.3);
@@ -410,7 +412,23 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
             o = over(o, float3(0.97, 0.98, 1.0), fillA(blob, px * 3.6) * stuck);
         }
         bool happy = sleep || flop || groomBack;
-        o = catHeadFull(o, q, hc, s, ex.x, ex.y, happy, flop || groomBack, px, k, groomBack ? 0.0 : turn);
+        o = catHeadFull(o, q, hc, s, ex.x, ex.y, happy, flop || groomBack, px, k, groomBack || sleep ? 0.0 : turn);
+        if (sleep) {
+            // Curled up: chin on its front paws, tail wrapped round the front with its darker tip.
+            float paws = min(sdEll(q, float2(0.48, 0.1), float2(0.17, 0.085)), sdEll(q, float2(0.76, 0.09), float2(0.16, 0.08)));
+            o = over(o, catLine, fillA(paws - 0.022, px) * 0.8);
+            o = over(o, k.white, fillA(paws, px));
+            // From behind the rump, round under the body, tapering, the tip curled up.
+            float2 w0 = float2(-0.9, 0.4), w1 = float2(-0.86, 0.14), w2 = float2(-0.6, 0.04), w3 = float2(0.18, 0.06);
+            float2 w4 = float2(0.36, 0.17 + 0.02 * sway);
+            float path = min(min(segDist(q, w0, w1), segDist(q, w1, w2)), min(segDist(q, w2, w3), segDist(q, w3, w4)));
+            float taper = mix(0.12, 0.065, smoothstep(-0.7, 0.36, q.x));
+            float wrap = path - taper - 0.025 * k.fluff * fur(q, w2, 12.0);
+            o = over(o, catLine, fillA(wrap - 0.025, px) * 0.9);
+            float3 tailCol = mix(k.dark, k.main, smoothstep(0.06, 0.3, length(q - w4)));
+            o = over(o, tailCol, fillA(wrap, px));
+            o = over(o, k.dark, fillA(wrap, px) * k.stripes * smoothstep(0.5, 0.85, sin(q.x * 14.0)) * 0.8);
+        }
         if (ex2.y > 0.01) {
             float2 cell = floor(q * 4.0);
             float2 f = fract(q * 4.0) - 0.5;

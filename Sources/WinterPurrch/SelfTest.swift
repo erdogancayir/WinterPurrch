@@ -209,6 +209,12 @@ enum SelfTest {
             run(3.5) { t in spot + SIMD2(sin(t * 40) * c.size * 0.6, 0) }
             catLine("stroked")
             shot("cat-stroked")
+            run(60)
+            catLine("a minute later, untouched")
+            sim.beginGrab(at: sim.cat!.center)
+            sim.endGrab()
+            run(0.3)
+            catLine("clicked awake")
         }
 
         // The two friends meet on the ground: they nuzzle or play tag.
