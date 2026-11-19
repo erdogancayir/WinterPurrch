@@ -30,6 +30,7 @@ WinterPurrch runs in the background with a settings window and a menu bar icon. 
 - **A friend:** a chubby ginger tabby with short fur and amber eyes keeps it company. The two go looking for each other, and when they meet they touch noses, wash each other's heads, curl up together for a nap, play-fight, or play tag. Sometimes one just tags along behind the other.
 - **Their own business:** they mostly look where they're going and only now and then glance up at you.
 - **Adjustable size:** a Cat Size slider in the menu, and a Friend toggle.
+- **A skater:** once the snow is deep, a kid in a bobble hat skates in, carving a groove and throwing up powder, pops kickflips, 360s and grabs, ollies up onto the Dock to grind along it, and rides off the other side. Cats in the way leap aside. You can also call the skater from the settings.
 - **Blizzard mode:** heavier snow and gusting wind.
 - **Light on resources:** about 7% of one core and around 50 MB of memory.
 
@@ -49,6 +50,7 @@ The window and the menu offer the same settings:
 | Accumulate | Choose where it settles: ground, Dock, windows |
 | Blizzard | Heavier snow with gusts |
 | Cat / Friend / Cat Size | Show or hide the cat and its friend, and set their size |
+| Skater / Call the Skater | Let the skater visit when the snow is deep, or bring it in now |
 | Melt | Drifts slowly thaw so they don't take over the screen |
 | Clear Snow | Removes all settled snow and snowballs |
 | Pause | Stops the snow |
@@ -92,6 +94,7 @@ tail -f ~/Library/Logs/WinterPurrch.log
 | --- | --- |
 | `Simulation.swift` | Snow physics: flakes, heightmap drifts, snowballs, snowmen |
 | `Cat.swift` | The cat's behaviour, the mugs it brings and the hearts it purrs |
+| `Skater.swift` | The skater: riding the drifts, tricks, grinding the Dock |
 | `Renderer.swift` | Metal shaders for flakes, drifts, snowballs and the cat, drawn from shapes (compiled at runtime) |
 | `Overlay.swift` | One transparent panel per screen; takes the mouse only while you make a snowball |
 | `Surfaces.swift` | Reads window positions and the Dock's exact frame |

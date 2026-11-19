@@ -16,6 +16,7 @@ struct Settings {
     var blizzard = false
     var cat = true
     var friend = true
+    var skater = true
     var catSize: Float = 42
 }
 
@@ -114,6 +115,8 @@ final class SnowSimulation {
     var cats: [Cat] = []
     var friendCooldown: Float = 15
     var friendSeek: Float = 20
+    var skater: Skater?
+    var skaterCooldown: Float = 90
     /// The first cat, for code that deals with one.
     var cat: Cat? {
         get { cats.first }
@@ -352,6 +355,7 @@ final class SnowSimulation {
         if let p = cursor, heldBall == nil { carve(around: p, active) }
         updateBalls(dt, active)
         updateCat(dt, active)
+        updateSkater(dt)
         settle(dt, active)
         if !pending.isEmpty {
             flakes.append(contentsOf: pending)

@@ -439,6 +439,99 @@ float4 drawCat(float2 uv, float px, float phase, float facing, float4 ex, float4
     return o;
 }
 
+// A kid on a skateboard: red bobble hat, striped scarf, yellow puffer jacket. Units: y = 0 under the wheels.
+// ex: x crouch, y kickflip (0...1), z spin, w tilt. ex2: x grab.
+float4 drawSkater(float2 uv, float px, float phase, float facing, float4 ex, float4 ex2) {
+    float2 q = float2(uv.x * facing, uv.y + 1.25);
+    float crouch = ex.x, flip = ex.y, spin = ex.z, tilt = ex.w, grab = ex2.x;
+    float rot = spin + tilt;
+    if (rot != 0.0) {
+        float2 c0 = float2(0.0, 1.1);
+        float ca = cos(rot), sa = sin(rot);
+        float2 d = q - c0;
+        q = c0 + float2(ca * d.x + sa * d.y, -sa * d.x + ca * d.y);
+    }
+    float4 o = float4(0);
+
+    // The board, turning about its long axis in a kickflip. Lifted to the hand in a grab.
+    float lift = grab * 0.12;
+    float fl = cos(flip * 6.2831853);
+    float thin = max(abs(fl), 0.12);
+    float2 bq = q - float2(0.0, 0.24 + lift);
+    float kick = 0.1 * smoothstep(0.6, 0.95, abs(bq.x));
+    float deck = sdBox(float2(bq.x, (bq.y - kick * sign(fl) * thin) / thin), float2(0.92, 0.05), 0.05) * thin;
+    float2 wl = float2(-0.56, 0.24 + lift - 0.14 * fl), wr = float2(0.56, 0.24 + lift - 0.14 * fl);
+    float wheels = min(length(q - wl), length(q - wr)) - 0.085;
+    float trucks = min(segDist(q, float2(-0.56, 0.24 + lift), wl), segDist(q, float2(0.56, 0.24 + lift), wr)) - 0.035;
+    float3 deckCol = fl > 0.0 ? float3(0.16, 0.66, 0.72) : float3(0.98, 0.45, 0.4);
+    o = over(o, catLine, fillA(min(deck, min(wheels, trucks)) - 0.025, px) * 0.9);
+    if (fl > 0.0) {
+        o = over(o, float3(0.62, 0.64, 0.68), fillA(trucks, px));
+        o = over(o, float3(0.98, 0.9, 0.4), fillA(wheels, px));
+        o = over(o, deckCol, fillA(deck, px));
+        o = over(o, float3(0.18, 0.18, 0.22), fillA(max(deck, (0.24 + lift + 0.02 * thin) - q.y), px));   // grip tape
+    } else {
+        o = over(o, deckCol, fillA(deck, px));
+        o = over(o, float3(1.0, 0.95, 0.85), fillA(max(deck, abs(bq.x) - 0.25), px) * 0.8);                 // a stripe under the deck
+        o = over(o, float3(0.62, 0.64, 0.68), fillA(trucks, px));
+        o = over(o, float3(0.98, 0.9, 0.4), fillA(wheels, px));
+    }
+
+    // The rider, knees bending as it crouches.
+    float cr = crouch * 0.22 + grab * 0.12;
+    float2 hip = float2(0.0, 1.05 - cr);
+    float2 footB = float2(-0.38, 0.34 + lift), footF = float2(0.38, 0.34 + lift);
+    float2 kneeB = float2(-0.34, 0.7 - cr * 0.5), kneeF = float2(0.36, 0.72 - cr * 0.5);
+    float legs = min(min(segDist(q, hip + float2(-0.1, 0.0), kneeB), segDist(q, kneeB, footB)),
+                     min(segDist(q, hip + float2(0.1, 0.0), kneeF), segDist(q, kneeF, footF))) - 0.1;
+    float shoes = min(sdEll(q, footB + float2(0.0, 0.03), float2(0.16, 0.075)), sdEll(q, footF + float2(0.03, 0.03), float2(0.16, 0.075)));
+    float2 bc = float2(0.02, 1.38 - cr);
+    float body = sdEll(q, bc, float2(0.34, 0.4));
+    float2 sh = bc + float2(0.0, 0.2);
+    float2 handB = float2(-0.8, 1.45 - cr + 0.14 * sin(phase));
+    float2 handF = grab > 0.5 ? float2(0.5, 0.42 + lift) : float2(0.78, 1.5 - cr - 0.14 * sin(phase));
+    float2 elbowB = mix(sh, handB, 0.5) + float2(0.0, 0.08);
+    float2 elbowF = mix(sh, handF, 0.5) + float2(0.08, grab > 0.5 ? 0.0 : 0.1);
+    float arms = min(min(segDist(q, sh, elbowB), segDist(q, elbowB, handB)), min(segDist(q, sh, elbowF), segDist(q, elbowF, handF))) - 0.09;
+    float mitts = min(length(q - handB), length(q - handF)) - 0.1;
+    float2 hc = float2(0.1, 2.05 - cr);
+    float head = length(q - hc) - 0.42;
+    float hat = max(sdEll(q, hc + float2(-0.02, 0.1), float2(0.46, 0.42)), (hc.y + 0.1) - q.y);
+    float band = sdBox(q - (hc + float2(-0.02, 0.15)), float2(0.46, 0.065), 0.04);
+    float2 pc = hc + float2(-0.08, 0.56);
+    float pom = length(q - pc) - 0.13 - 0.02 * fur(q, pc, 10.0);
+    float2 n = hc + float2(-0.04, -0.42);
+    float2 s1 = n + float2(-0.36, 0.06 + 0.07 * sin(phase * 2.0));
+    float2 s2 = s1 + float2(-0.32, 0.03 + 0.11 * sin(phase * 2.0 + 1.5));
+    float scarfTail = min(segDist(q, n, s1), segDist(q, s1, s2)) - 0.065;
+    float scarf = min(sdBox(q - n, float2(0.3, 0.07), 0.05), scarfTail);
+    float D = min(min(min(legs, shoes), min(body, arms)), min(min(mitts, head), min(min(hat, pom), min(scarf, band))));
+
+    o = over(o, catLine, fillA(D - 0.03, px) * 0.9);
+    o = over(o, float3(0.24, 0.32, 0.56), fillA(legs, px));
+    o = over(o, float3(0.96, 0.96, 0.98), fillA(shoes, px));
+    o = over(o, float3(0.86, 0.22, 0.22), fillA(max(shoes, q.y - (footB.y - 0.01)), px));
+    float3 scarfCol = mix(float3(0.18, 0.62, 0.68), float3(0.96, 0.96, 0.96), step(0.5, fract((q.x + q.y) * 4.0)));
+    o = over(o, scarfCol, fillA(scarfTail, px));
+    float quilt = smoothstep(0.75, 0.95, sin(q.y * 20.0)) * 0.12;
+    o = over(o, float3(1.0, 0.77, 0.22) * (1.0 - quilt), fillA(body, px));
+    o = over(o, float3(0.96, 0.7, 0.17), fillA(arms, px));
+    o = over(o, float3(0.86, 0.2, 0.22), fillA(mitts, px));
+    o = over(o, scarfCol, fillA(sdBox(q - n, float2(0.3, 0.07), 0.05), px));
+    o = over(o, float3(1.0, 0.87, 0.76), fillA(head, px));
+    o = over(o, float3(0.98, 0.6, 0.62), fillA(length(q - (hc + float2(0.24, -0.13))) - 0.075, px * 3.0) * 0.55);
+    float2 e1 = hc + float2(0.12, -0.01), e2 = hc + float2(0.31, -0.01);
+    o = over(o, float3(0.12, 0.1, 0.12), fillA(min(sdEll(q, e1, float2(0.045, 0.06)), sdEll(q, e2, float2(0.042, 0.058))), px));
+    o = over(o, float3(1.0), fillA(min(length(q - e1 - float2(0.015, 0.02)), length(q - e2 - float2(0.015, 0.02))) - 0.016, px));
+    float2 mc = hc + float2(0.25, -0.15);
+    float smile = max(abs(length(q - mc) - 0.075) - 0.018, q.y - mc.y);
+    o = over(o, float3(0.45, 0.2, 0.22), fillA(smile, px));
+    o = over(o, float3(0.86, 0.16, 0.2), fillA(hat, px));
+    o = over(o, float3(0.97, 0.97, 0.97), fillA(band, px));
+    o = over(o, float3(0.98, 0.98, 0.98), fillA(pom, px));
+    return o;
+}
+
 // A mug of coffee, steaming while it is fresh. Units are the mug's size.
 float4 drawMug(float2 p, float px, float steam, float time, float seed) {
     float4 o = float4(0);
@@ -486,7 +579,8 @@ fragment float4 spriteF(SOut in [[stage_in]], constant U& u [[buffer(0)]]) {
         if (in.kind < 5.5) c = drawCat(uv, px, in.seed, in.facing, in.ex, in.ex2, u.time);
         else if (in.kind < 6.5) c = drawMug(uv, px, in.ex.x, u.time, in.seed);
         else if (in.kind < 7.5) c = drawHeart(uv, px);
-        else c = drawZ(uv, px);
+        else if (in.kind < 8.5) c = drawZ(uv, px);
+        else c = drawSkater(uv, px, in.seed, in.facing, in.ex, in.ex2);
         return c * in.alpha;
     }
     if (in.kind < 0.5) {
@@ -783,6 +877,11 @@ final class Renderer: NSObject, MTKViewDelegate {
                 sprites.append(SpriteInstance(px: m.x, py: m.y, r: Mug.size * 0.8, alpha: 1, kind: 6, seed: 0, ext: 2.4,
                                               pad: 1, a: 1))
             }
+        }
+        if let sk = sim.skater {
+            let c = sk.p + SIMD2(0, sk.unit * 1.25)
+            sprites.append(SpriteInstance(px: c.x, py: c.y, r: sk.unit, alpha: 1, kind: 9, seed: sk.phase, ext: 2.0,
+                                          pad: sk.facing, a: sk.crouch, b: sk.flip, c: sk.spin, d: sk.tilt, e: sk.grab))
         }
         for h in sim.hearts {
             let grow: Float = h.isZ ? 0.7 + (1 - h.life) * 0.6 : 1

@@ -175,7 +175,7 @@ extension SnowSimulation {
     }
 
     /// A fright from `x`: a short hop straight up with its fur on end, then a dash the other way.
-    private func startle(_ c: inout Cat, from x: Float) {
+    func startle(_ c: inout Cat, from x: Float) {
         c.deepSleep = false
         c.social = .none
         c.seeking = false

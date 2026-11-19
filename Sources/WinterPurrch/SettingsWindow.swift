@@ -8,6 +8,7 @@ final class SettingsModel: ObservableObject {
     var apply: () -> Void = {}
     var setPaused: (Bool) -> Void = { _ in }
     var clearSnow: () -> Void = {}
+    var callSkater: () -> Void = {}
 
     @Published var intensity: Double { didSet { prefs.intensity = Float(intensity); apply() } }
     @Published var opacity: Double { didSet { prefs.opacity = Float(opacity); apply() } }
@@ -20,6 +21,7 @@ final class SettingsModel: ObservableObject {
     @Published var friend: Bool { didSet { prefs.friend = friend; apply() } }
     @Published var catSize: Double { didSet { prefs.catSize = Float(catSize); apply() } }
     @Published var screenshots: Bool { didSet { prefs.screenshots = screenshots; apply() } }
+    @Published var skater: Bool { didSet { prefs.skater = skater; apply() } }
     @Published var paused = false { didSet { setPaused(paused) } }
     @Published var openAtLogin: Bool {
         didSet {
@@ -46,13 +48,14 @@ final class SettingsModel: ObservableObject {
         friend = prefs.friend
         catSize = Double(prefs.catSize)
         screenshots = prefs.screenshots
+        skater = prefs.skater
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
     /// Picks up changes made from the menu bar.
     func reload(paused: Bool) {
         let fresh = SettingsModel()
-        let keep = (apply, setPaused, clearSnow)
+        let keep = (apply, setPaused, clearSnow, callSkater)
         apply = {}
         setPaused = { _ in }
         intensity = fresh.intensity
@@ -66,8 +69,9 @@ final class SettingsModel: ObservableObject {
         friend = fresh.friend
         catSize = fresh.catSize
         screenshots = fresh.screenshots
+        skater = fresh.skater
         self.paused = paused
-        (apply, setPaused, clearSnow) = keep
+        (apply, setPaused, clearSnow, callSkater) = keep
     }
 }
 
@@ -98,6 +102,10 @@ struct SettingsView: View {
                 Text(L("Click a cat to startle it; rest or stroke the cursor on it to pet it. Hold ⌥ and drag snow to make snowballs."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            Section(L("Skater")) {
+                Toggle(L("Skater shows up when the snow is deep"), isOn: $model.skater)
+                Button(L("Call the Skater")) { model.callSkater() }.disabled(!model.skater)
             }
             Section(L("General")) {
                 Toggle(L("Pause"), isOn: $model.paused)

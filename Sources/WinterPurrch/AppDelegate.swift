@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.refreshVisibility()
         }
         model.clearSnow = { [weak self] in self?.clearSnow() }
+        model.callSkater = { [weak self] in self?.callSkater() }
         // The first time, show where everything is: the menu bar icon may well be hidden behind the notch.
         if !UserDefaults.standard.bool(forKey: "welcomed") {
             UserDefaults.standard.set(true, forKey: "welcomed")
@@ -180,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hint3.isEnabled = false
         menu.addItem(hint3)
         menu.addItem(item(L("Clear Snow"), #selector(clearSnow)))
+        if prefs.skater { menu.addItem(item(L("Call the Skater"), #selector(callSkater))) }
         menu.addItem(item(paused ? L("Resume") : L("Pause"), #selector(togglePause)))
         menu.addItem(.separator())
 
@@ -226,6 +228,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         i.view = SliderMenuView(title: title, value: value, range: range, onChange: onChange)
         return i
     }
+
+    @objc func callSkater() { screens.forEach { $0.simulation.callSkater() } }
 
     @objc func clearSnow() { screens.forEach { $0.simulation.clear() } }
 

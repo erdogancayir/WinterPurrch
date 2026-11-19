@@ -243,6 +243,22 @@ enum SelfTest {
             shot("nap")
         }
 
+        // The skater: rides in, pops tricks, grinds the Dock and leaves.
+        sim.callSkater()
+        var frames = 0, airborne = 0, onDock = 0, tricks = Set<String>()
+        var shotAir = false, shotDock = false, shotRide = false
+        while sim.skater != nil && frames < 60 * 20 {
+            run(1.0 / 60)
+            frames += 1
+            guard let sk = sim.skater else { break }
+            if sk.airborne { airborne += 1; tricks.insert("\(sk.trick)") }
+            if sk.onDock { onDock += 1 }
+            if !shotRide && !sk.airborne && sk.p.x > 60 && sk.p.x < 840 && frames > 20 { shot("skater-ride"); shotRide = true }
+            if !shotAir && sk.airborne && (sk.flip > 0.3 || abs(sk.spin) > 1.5 || sk.grab > 0.5) { shot("skater-trick"); shotAir = true }
+            if !shotDock && sk.onDock && frames % 5 == 0 { shot("skater-dock"); shotDock = true }
+        }
+        print("selftest: skater rode \(frames) frames, airborne \(airborne), on the Dock \(onDock), tricks \(tricks.sorted()), gone=\(sim.skater == nil)")
+
         // A window dragged quickly throws its snow off.
         let moved = [WindowInfo(id: 1, rect: windowA.offsetBy(dx: 60, dy: 0)), WindowInfo(id: 2, rect: windowB)]
         sim.updateWindows(moved, dt: 1.0 / 30, keepVanished: false)
@@ -289,6 +305,29 @@ enum SelfTest {
             let rep = NSBitmapImageRep(cgImage: image)
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(outputDirectory)/\(coat == 0 ? "cat" : "friend")-\(name).png"))
         }
+        }
+        // The skater: riding, crouched, kickflip halfway, spinning, grabbing.
+        let skaterPoses: [(String, Float, Float, Float, Float)] = [
+            ("ride", 0, 0, 0, 0), ("crouch", 1, 0, 0, 0), ("kickflip", 0, 0.5, 0, 0), ("spin", 0, 0, 2.2, 0), ("grab", 0, 0, 0, 1),
+        ]
+        for (name, crouch, flip, spin, grab) in skaterPoses {
+            let sim = SnowSimulation(size: SIMD2(300, 260), topLimit: 250)
+            var s = Settings()
+            s.intensity = 0.01
+            s.cat = false
+            sim.applySettings(s)
+            var sk = Skater(p: SIMD2(150, 30), v: .zero, facing: 1, unit: 50)
+            sk.crouch = crouch
+            sk.flip = flip
+            sk.spin = spin
+            sk.grab = grab
+            sim.skater = sk
+            guard let device = MTLCreateSystemDefaultDevice(),
+                  let renderer = Renderer(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1, simulation: sim),
+                  let image = renderer.snapshot(width: 300, height: 260, background: MTLClearColor(red: 0.55, green: 0.7, blue: 0.95, alpha: 1))
+            else { return 1 }
+            try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: "\(outputDirectory)/skater-\(name).png"))
         }
         return 0
     }
