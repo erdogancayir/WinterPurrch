@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             UserDefaults.standard.set(true, forKey: "welcomed")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showSettings() }
         }
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.saveScene() }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(pollTimer!, forMode: .common)
 
@@ -76,11 +77,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showSettings() { settingsWindow.show(paused: paused) }
 
+    /// Keeps the drifts, snowmen and mugs for next time.
+    private func saveScene() {
+        var scenes = SceneStore.load()
+        for s in screens { scenes[SceneStore.key(for: s.screen)] = s.simulation.savedState() }
+        SceneStore.save(scenes)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) { saveScene() }
+
     // MARK: - Screens
 
     private func rebuildScreens() {
+        if !screens.isEmpty { saveScene() }
         screens.forEach { $0.close() }
         screens = NSScreen.screens.compactMap { ScreenSnow(screen: $0, settings: prefs.settings) }
+        let saved = SceneStore.load()
+        for s in screens {
+            if let state = saved[SceneStore.key(for: s.screen)] { s.simulation.restore(state) }
+        }
         dockCheckedAt = 0
         applyFrameRate()
         refreshVisibility()

@@ -20,6 +20,9 @@ codesign --force --sign - "$app"
 echo "Built $app"
 
 if [[ "${1:-}" == "--install" ]]; then
+    # Quit it properly so it saves its snow, then make sure it is gone.
+    osascript -e 'quit app "WinterPurrch"' 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x WinterPurrch >/dev/null || break; sleep 0.3; done
     pkill -x WinterPurrch 2>/dev/null || true
     rm -rf /Applications/WinterPurrch.app
     ditto "$app" /Applications/WinterPurrch.app

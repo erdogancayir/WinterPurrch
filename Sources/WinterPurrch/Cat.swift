@@ -955,6 +955,8 @@ extension SnowSimulation {
                 if let id = m.ledge, let l = ledges[id], let col = l.column(at: l.x0 + m.offset), l.visible[col] {
                     let depth = l.h[col]
                     m.p = SIMD2(l.x0 + m.offset, l.y + depth - min(depth, 4) * 0.6)
+                } else if settling {
+                    // Restored from the last run: its window or the Dock hasn't been read yet.
                 } else {
                     m.resting = false
                     m.ledge = nil

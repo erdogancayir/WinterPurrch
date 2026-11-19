@@ -217,7 +217,9 @@ final class SnowSimulation {
             d.x0 = left
             d.y = top
         } else {
-            ledges[Self.dockID] = Ledge(id: Self.dockID, kind: .dock, x0: left, y: top, count: n)
+            let d = Ledge(id: Self.dockID, kind: .dock, x0: left, y: top, count: n)
+            if let saved = stash.removeValue(forKey: Self.dockID), saved.count == n { d.h = saved }
+            ledges[Self.dockID] = d
         }
     }
 
@@ -290,6 +292,52 @@ final class SnowSimulation {
         }
         if stash.count > 200 { stash.removeAll() }
     }
+
+    // MARK: - Saving
+
+    /// What is worth keeping across a restart: the drifts, snowballs and snowmen, and the mugs.
+    func savedState() -> SavedState {
+        var state = SavedState()
+        state.ground = ledges[Self.groundID]?.h
+        state.dock = ledges[Self.dockID]?.h
+        for (id, l) in ledges where l.kind == .window { state.windows[String(id)] = l.h }
+        for (id, h) in stash where id >= 0 { state.windows[String(id)] = h }
+        state.balls = balls.filter { $0.state == .resting }.map {
+            SavedState.Ball(uid: $0.uid, x: $0.p.x, y: $0.p.y, volume: $0.volume, ledge: $0.supportLedge,
+                            onBall: $0.supportBall, ox: $0.offset.x, oy: $0.offset.y, seed: $0.seed)
+        }
+        state.mugs = mugs.filter(\.resting).map {
+            SavedState.Mug(x: $0.p.x, y: $0.p.y, ledge: $0.ledge, offset: $0.offset, age: $0.age)
+        }
+        return state
+    }
+
+    func restore(_ state: SavedState) {
+        if let h = state.ground, let g = ledges[Self.groundID], g.h.count == h.count { g.h = h }
+        if let h = state.dock { stash[Self.dockID] = h }
+        for (key, h) in state.windows { if let id = Int(key) { stash[id] = h } }
+        balls = state.balls.map {
+            var b = Snowball(uid: $0.uid, p: SIMD2($0.x, $0.y), volume: $0.volume, state: .resting)
+            b.supportLedge = $0.ledge
+            b.supportBall = $0.onBall
+            b.offset = SIMD2($0.ox, $0.oy)
+            b.seed = $0.seed
+            return b
+        }
+        nextUID = (balls.map(\.uid).max() ?? 0) + 1
+        mugs = state.mugs.map {
+            var m = Mug(p: SIMD2($0.x, $0.y))
+            m.ledge = $0.ledge
+            m.offset = $0.offset
+            m.age = $0.age
+            m.resting = true
+            return m
+        }
+        refreshSnowmen()
+    }
+
+    /// Just after starting, the windows and the Dock have yet to be read: things resting on them wait for them.
+    var settling: Bool { time < 1.5 }
 
     func clear() {
         for l in ledges.values {
@@ -812,12 +860,13 @@ final class SnowSimulation {
         let r = balls[i].r
         if let id = balls[i].supportLedge {
             guard let l = ledges[id], let c = l.column(at: l.x0 + balls[i].offset.x), l.visible[c] else {
-                fall(i)
+                if !settling { fall(i) }
                 return
             }
             balls[i].p = SIMD2(l.x0 + balls[i].offset.x, l.y + l.h[c] + r * 0.82)
         } else if let o = balls[i].supportBall {
             guard let j = ballIndex(o), balls[j].state == .resting else {
+                if settling { return }
                 fall(i)
                 return
             }

@@ -120,6 +120,29 @@ enum SelfTest {
         shot("settled")
         report(sim, "end", since: start)
 
+        // Saving and restoring: the snowman and the drifts come back after a restart.
+        do {
+            let data = try JSONEncoder().encode(sim.savedState())
+            let state = try JSONDecoder().decode(SavedState.self, from: data)
+            let again = SnowSimulation(size: size, topLimit: 500)
+            again.applySettings(s)
+            again.restore(state)
+            for k in 0..<240 {
+                if k % 4 == 2 {
+                    again.updateWindows(windows, dt: 1.0 / 15, keepVanished: false)
+                    again.updateDock(dock)
+                }
+                again.step(dt: 1.0 / 60, cursor: nil)
+            }
+            let before = sim.balls.filter { $0.state == .resting }.map { Int($0.p.y) }.sorted()
+            let after = again.balls.filter { $0.state == .resting }.map { Int($0.p.y) }.sorted()
+            print("selftest: restore: \(data.count) bytes, balls \(before) -> \(after), snowman=\(again.balls.contains { $0.hat }), "
+                  + "dock snow \(Int(sim.ledges[SnowSimulation.dockID]?.total ?? 0)) -> \(Int(again.ledges[SnowSimulation.dockID]?.total ?? 0)), "
+                  + "window snow \(Int(sim.ledges[1]?.total ?? 0)) -> \(Int(again.ledges[1]?.total ?? 0))")
+        } catch {
+            print("selftest: restore failed: \(error)")
+        }
+
         // The cat: drops in, wanders, plays on the Dock, jumps when poked, fetches coffee, purrs when petted.
         sim.hostsCat = true
         sim.applySettings(s)
