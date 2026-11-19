@@ -108,13 +108,28 @@ final class ScreenSnow {
         renderer.onFrame = { [weak self] dt in self?.frame(dt) }
     }
 
+    private var shown = false
+    private var occlusionObserver: NSObjectProtocol?
+
     func show(screenshots: Bool) {
+        shown = true
         panel.sharingType = screenshots ? .readOnly : .none
         panel.orderFrontRegardless()
-        view.isPaused = false
+        if occlusionObserver == nil {
+            // Covered by a full-screen app or video, there is nothing to see: stop drawing until it shows again.
+            occlusionObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: panel, queue: .main
+            ) { [weak self] _ in self?.updatePaused() }
+        }
+        updatePaused()
+    }
+
+    private func updatePaused() {
+        view.isPaused = !shown || !panel.occlusionState.contains(.visible)
     }
 
     func hide() {
+        shown = false
         view.isPaused = true
         panel.orderOut(nil)
     }

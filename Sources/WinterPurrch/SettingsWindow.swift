@@ -22,6 +22,7 @@ final class SettingsModel: ObservableObject {
     @Published var catSize: Double { didSet { prefs.catSize = Float(catSize); apply() } }
     @Published var screenshots: Bool { didSet { prefs.screenshots = screenshots; apply() } }
     @Published var skater: Bool { didSet { prefs.skater = skater; apply() } }
+    @Published var batterySaver: Bool { didSet { prefs.batterySaver = batterySaver; apply() } }
     @Published var paused = false { didSet { setPaused(paused) } }
     @Published var openAtLogin: Bool {
         didSet {
@@ -49,6 +50,7 @@ final class SettingsModel: ObservableObject {
         catSize = Double(prefs.catSize)
         screenshots = prefs.screenshots
         skater = prefs.skater
+        batterySaver = prefs.batterySaver
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -70,6 +72,7 @@ final class SettingsModel: ObservableObject {
         catSize = fresh.catSize
         screenshots = fresh.screenshots
         skater = fresh.skater
+        batterySaver = fresh.batterySaver
         self.paused = paused
         (apply, setPaused, clearSnow, callSkater) = keep
     }
@@ -110,6 +113,7 @@ struct SettingsView: View {
             Section(L("General")) {
                 Toggle(L("Pause"), isOn: $model.paused)
                 Toggle(L("Open at Login"), isOn: $model.openAtLogin)
+                Toggle(L("Save battery: slower on battery, paused when it runs low"), isOn: $model.batterySaver)
                 Toggle(L("Show in Screenshots"), isOn: $model.screenshots)
                 if let error = model.loginError {
                     Text(error).font(.footnote).foregroundStyle(.red)

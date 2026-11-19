@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.ps
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let model = settingsWindow.model
         model.apply = { [weak self] in
             self?.applySettings()
+            self?.applyFrameRate()
             self?.refreshVisibility()
         }
         model.setPaused = { [weak self] value in
@@ -42,6 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showSettings() }
         }
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.saveScene() }
+        checkPower()
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.checkPower() }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(pollTimer!, forMode: .common)
 
@@ -102,14 +106,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func refreshVisibility() {
+        let resting = paused || screensAsleep || (prefs.batterySaver && power.low)
         for s in screens {
-            if paused || screensAsleep { s.hide() } else { s.show(screenshots: prefs.screenshots) }
+            if resting { s.hide() } else { s.show(screenshots: prefs.screenshots) }
         }
     }
 
     private func applyFrameRate() {
-        let fps = ProcessInfo.processInfo.isLowPowerModeEnabled ? 30 : 60
-        screens.forEach { $0.setFrameRate(fps) }
+        let slow = ProcessInfo.processInfo.isLowPowerModeEnabled || (prefs.batterySaver && power.onBattery)
+        screens.forEach { $0.setFrameRate(slow ? 30 : 60) }
+    }
+
+    /// On battery, and whether the battery is running low (under a fifth, not charging).
+    private var power = (onBattery: false, low: false)
+
+    private func checkPower() {
+        var state = (onBattery: false, low: false)
+        if let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+           let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] {
+            for source in list {
+                guard let d = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any],
+                      d[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else { continue }
+                let onBattery = d[kIOPSPowerSourceStateKey] as? String == kIOPSBatteryPowerValue
+                let level = d[kIOPSCurrentCapacityKey] as? Int ?? 100
+                state = (onBattery, onBattery && level < 20)
+            }
+        }
+        guard state != power else { return }
+        power = state
+        applyFrameRate()
+        refreshVisibility()
     }
 
     private func applySettings() {
