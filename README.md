@@ -15,6 +15,7 @@ On a real desktop:
 
 <p align="center">
   <img src="docs/screenshot-snowman.png" width="420" alt="A big snowman with a top hat and stick arms, a tiny snowman and a mug of coffee beside the snowy Dock">
+  <img src="docs/screenshot-skater.png" width="420" alt="The skater in a red bobble hat pulling a trick in mid-air past the snowman">
 </p>
 
 WinterPurrch runs in the background with a settings window and a menu bar icon. It draws with Metal in a transparent overlay that never gets in the way of your clicks.
