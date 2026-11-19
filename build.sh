@@ -3,8 +3,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swift build -c release
-bin="$(swift build -c release --show-bin-path)"
+# UNIVERSAL=1 builds for Apple silicon and Intel at once (for releases).
+flags=(-c release)
+if [[ -n "${UNIVERSAL:-}" ]]; then flags+=(--arch arm64 --arch x86_64); fi
+swift build "${flags[@]}"
+bin="$(swift build "${flags[@]}" --show-bin-path)"
 
 app=build/WinterPurrch.app
 rm -rf "$app"

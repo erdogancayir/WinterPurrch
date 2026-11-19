@@ -42,6 +42,16 @@ WinterPurrch runs in the background with a settings window and a menu bar icon. 
 
 <p align="center"><img src="docs/cat.png" width="760" alt="The grey longhair and the ginger tabby in every pose: walking, sitting, holding a heart, grooming, napping, leaping, playing, digging, flopped over and shaking off snow"></p>
 
+## Install
+
+Download `WinterPurrch-<version>.dmg` from the [Releases](https://github.com/erdogancayir/WinterPurrch/releases) page, open it and drag WinterPurrch onto Applications. It runs on Apple silicon and Intel Macs with macOS 14 or later.
+
+WinterPurrch isn't signed with an Apple Developer ID, so the first time you open it macOS will say it can't check it. Open **System Settings › Privacy & Security**, scroll down and click **Open Anyway**. Or, in Terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/WinterPurrch.app
+```
+
 ## Settings
 
 Open WinterPurrch from Spotlight (⌘Space, then type "WinterPurrch") or Launchpad, even while it is already running, and its settings window appears. It also opens by itself the first time, and from **Open Settings…** (⌘,) in the ❄ menu bar menu. That matters on a MacBook with a crowded menu bar, where the icon can end up hidden behind the notch.
@@ -77,6 +87,15 @@ The window and the menu offer the same settings:
 ./build.sh --install  # copies it to /Applications and launches it
 ```
 
+### Releases
+
+`scripts/make-dmg.sh` builds a universal app and packs it into `build/WinterPurrch-<version>.dmg`. To publish one, set the version in `Resources/Info.plist`, then push a tag: the Release workflow builds the disk image and attaches it to a new GitHub release.
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 ### Headless self-test
 
 The simulation can run a scripted scene without a screen and save pictures of it:
@@ -84,6 +103,8 @@ The simulation can run a scripted scene without a screen and save pictures of it
 ```sh
 .build/release/WinterPurrch --selftest /tmp/winterpurrch
 ```
+
+`--catsheet <dir>` draws every pose of both cats and the skater, `--icon <dir>` renders the app icon and `--settingsshot <file>` draws the settings window.
 
 It snows on two windows and a Dock, sweeps a drift with the cursor, builds a snowman, throws a snowball, lets the cat play, jump and fetch coffee, and shakes a window, then prints how deep the snow got and how long a simulation step takes.
 
